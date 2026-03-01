@@ -1,135 +1,139 @@
-# 🔥 Gas Monitoring System
+# Gas Monitoring System
 
 Smart gas monitoring system with real-time ML predictions and Telegram alerts.
 
-## 🚀 Quick Start
+## Overview
 
-```powershell
-# 1. Start Docker services
-docker-compose up -d
+This system monitors gas sensors (MQ135, MQ5, R1-R8) and environmental conditions (temperature, humidity) using machine learning for predictive analysis and classification. It provides real-time visualization through Grafana dashboards and sends alerts via Telegram bot.
 
-# 2. Start ML API
-python ml_predictor_hybrid.py
+## Tech Stack
 
-# 3. Access services
-# Node-RED: http://localhost:1880
-# Grafana: http://localhost:3000 (admin/admin)
-# API: http://localhost:8000
-```
+- **Node-RED** (Port 1880) - Data collection and flow control
+- **InfluxDB 1.8** (Port 8086) - Time-series database
+- **Grafana** (Port 3000) - Visualization dashboard
+- **FastAPI** (Port 8000) - ML prediction API
+- **Telegram Bot** - Alert notifications
+- **Docker** - Container orchestration
 
-## 📦 Tech Stack
+## Machine Learning Models
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **Node-RED** | 1880 | Data collection & flow control |
-| **InfluxDB 1.8** | 8086 | Time-series database |
-| **Grafana** | 3000 | Visualization dashboard |
-| **FastAPI** | 8000 | ML API (LSTM + SVM) |
-| **Telegram Bot** | - | Real-time alerts |
+### LSTM Regression Models (3 models)
+- **CO prediction**: lstm_co_model.h5 (Window: 20 timesteps, Features: 17)
+- **Ethanol prediction**: lstm_eth_model_gen.h5 (Window: 20 timesteps, Features: 17)
+- **Temperature prediction**: lstm_ht_model.h5 (Window: 20 timesteps, Features: 9)
 
-## 🧠 ML Models
-
-### LSTM Regression (3 models)
-- **CO**: `lstm_co_model.h5` (20×17 features)
-- **Ethanol**: `lstm_eth_model_gen.h5` (20×17 features)
-- **Temperature**: `lstm_ht_model.h5` (20×9 features)
-
-### SVM Classification
-- **Status**: `svm_ht_model_downsampled_10x.pkl`
+### SVM Classification Model
+- **File**: svm_ht_model_downsampled_10x.pkl
+- **Scaler**: ht_sensor_scaler.pkl
 - **Classes**: NORMAL, WARNING, DANGER
-- **Scaler**: `ht_sensor_scaler.pkl`
+- **Features**: 10 features from temperature and humidity sensors
 
-## 🚨 Alert Logic
+## Alert Logic
 
 | Condition | Level | Action |
 |-----------|-------|--------|
-| CO > 0.7 OR Temp > 0.8 OR SVM=DANGER | 🚨 DANGER | Telegram |
-| CO > 0.5 OR Ethanol > 0.6 OR SVM=WARNING | ⚠️ WARNING | Telegram |
-| All OK AND SVM=NORMAL | ✅ NORMAL | None |
+| CO > 0.7 OR Temperature > 0.8 OR SVM=DANGER | DANGER | Send Telegram alert |
+| CO > 0.5 OR Ethanol > 0.6 OR SVM=WARNING | WARNING | Send Telegram alert |
+| All OK AND SVM=NORMAL | NORMAL | No alert |
 
-## 📁 Project Structure
-
-```
-gas-dashboard/
-├── ml_predictor_hybrid.py          # FastAPI ML server
-├── docker-compose.yml              # Docker services
-├── requirements.txt                # Python dependencies
-├── nodered-flow-ml-api.json        # Main Node-RED flow
-├── nodered-flow-telegram.json      # Telegram integration
-├── grafana-dashboard-enhanced-direct.json  # Dashboard config
-├── lstm_*.h5                       # LSTM models
-├── svm_*.pkl, *_scaler.pkl         # SVM model + scaler
-├── SETUP-GUIDE.md                  # Detailed setup
-├── DEVELOPER.md                    # Architecture docs
-└── TROUBLESHOOTING.md              # Common issues
-```
-
-## 🔄 Data Flow
-
-```
-Sensors → Node-RED → InfluxDB (gas_data)
-                          ↓
-                    ML API (FastAPI)
-                    ├─ 3 LSTM → Predictions
-                    └─ 1 SVM → Classification
-                          ↓
-            InfluxDB (gas_predictions) + Telegram
-                          ↓
-                   Grafana Dashboard
-```
-
-## ⚙️ Installation
+## Quick Start
 
 ### Prerequisites
-- Docker Desktop
-- Python 3.10+
-- 4GB RAM minimum
+- Docker Desktop installed
+- Python 3.10 or higher
+- Minimum 4GB RAM
 
-### Setup
+### Installation Steps
 
-**1. Clone repository**
+1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/gas-dashboard.git
+git clone https://github.com/DongQuach1804/gas-dashboard.git
 cd gas-dashboard
 ```
 
-**2. Install Python dependencies**
+2. Create Python virtual environment:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-**3. Start services**
+3. Start Docker services:
 ```powershell
 docker-compose up -d
+```
+
+4. Start ML API server:
+```powershell
 python ml_predictor_hybrid.py
 ```
 
-**4. Import configurations**
-- **Node-RED**: Import `nodered-flow-ml-api.json` at http://localhost:1880
-- **Grafana**: Import `grafana-dashboard-enhanced-direct.json` at http://localhost:3000
+5. Access the services:
+- Node-RED: http://localhost:1880
+- Grafana: http://localhost:3000 (Username: admin, Password: admin)
+- API Documentation: http://localhost:8000/docs
 
-See [SETUP-GUIDE.md](SETUP-GUIDE.md) for detailed instructions.
+## Configuration
 
-## 📱 Telegram Integration (Optional)
+### Node-RED Flow
 
-1. Create bot via [@BotFather](https://t.me/BotFather)
-2. Get Chat ID from [@getidsbot](https://t.me/getidsbot)
-3. Import `nodered-flow-telegram.json` in Node-RED
-4. Configure bot token and chat ID
-5. Deploy
+1. Open Node-RED at http://localhost:1880
+2. Import the flow file: nodered-flow-ml-api.json
+   - Menu > Import > Select a file to import
+3. Configure InfluxDB node:
+   - Host: influxdb
+   - Port: 8086
+   - Database: gasdb
+   - Username: admin
+   - Password: adminpass
+4. Deploy the flow
 
-## 🔍 API Endpoints
+### Grafana Dashboard
 
-```bash
-# Health check
+1. Login to Grafana at http://localhost:3000
+2. Add InfluxDB data source:
+   - Configuration > Data Sources > Add data source
+   - Type: InfluxDB
+   - Query Language: InfluxQL
+   - URL: http://influxdb:8086
+   - Database: gasdb
+   - User: admin
+   - Password: adminpass
+3. Import dashboard: grafana-dashboard-enhanced-direct.json
+   - Create > Import > Upload JSON file
+
+### Telegram Bot (Optional)
+
+To enable Telegram alerts:
+
+1. Create a new bot:
+   - Message @BotFather on Telegram
+   - Use /newbot command
+   - Save the bot token
+
+2. Get your Chat ID:
+   - Message @getidsbot on Telegram
+   - Save the chat ID
+
+3. Configure Node-RED:
+   - Import nodered-flow-telegram.json
+   - Configure Telegram bot node with your token and chat ID
+   - Deploy the flow
+
+## API Endpoints
+
+### Health Check
+```
 GET http://localhost:8000/health
+```
 
-# Model info
+### Get Models Info
+```
 GET http://localhost:8000/models
+```
 
-# Predict
+### Make Prediction
+```
 POST http://localhost:8000/predict
 Content-Type: application/json
 
@@ -138,11 +142,18 @@ Content-Type: application/json
   "MQ5": 150.3,
   "R1": 100.0,
   "R2": 110.5,
-  ...
+  "R3": 105.0,
+  "R4": 95.0,
+  "R5": 120.0,
+  "R6": 98.0,
+  "R7": 115.0,
+  "R8": 102.0,
+  "Temperature": 28.5,
+  "Humidity": 65.0
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "co": 0.42,
@@ -157,63 +168,169 @@ Content-Type: application/json
 }
 ```
 
-## 🛠️ Development
+## Data Flow
 
-```powershell
-# Run with auto-reload
-uvicorn ml_predictor_hybrid:app --reload
-
-# Check logs
-docker logs nodered
-docker logs influxdb
-docker logs grafana
+```
+Sensors (MQ135, MQ5, R1-R8, Temp, Humidity)
+    |
+    v
+Node-RED (Data Collection)
+    |
+    v
+InfluxDB (gas_data measurement)
+    |
+    v
+ML API (FastAPI)
+    |-- LSTM Models --> Regression Predictions (CO, Ethanol, Temperature)
+    |-- SVM Model --> Classification (NORMAL/WARNING/DANGER)
+    v
+InfluxDB (gas_predictions measurement) + Telegram Alerts
+    |
+    v
+Grafana Dashboard (Visualization)
 ```
 
-## 🆘 Troubleshooting
+## Project Structure
 
-**API not starting:**
+```
+gas-dashboard/
+├── ml_predictor_hybrid.py              # FastAPI ML prediction server
+├── docker-compose.yml                  # Docker services configuration
+├── requirements.txt                    # Python dependencies
+│
+├── lstm_co_model.h5                    # LSTM model for CO prediction
+├── lstm_eth_model_gen.h5               # LSTM model for Ethanol prediction
+├── lstm_ht_model.h5                    # LSTM model for Temperature prediction
+├── svm_ht_model_downsampled_10x.pkl    # SVM classification model
+├── ht_sensor_scaler.pkl                # MinMaxScaler for SVM features
+│
+├── nodered-flow-ml-api.json            # Main Node-RED flow
+├── nodered-flow-telegram.json          # Telegram bot flow
+├── grafana-dashboard-enhanced-direct.json  # Grafana dashboard configuration
+│
+├── SETUP-GUIDE.md                      # Detailed setup instructions
+├── DEVELOPER.md                        # Architecture and development guide
+├── TROUBLESHOOTING.md                  # Common issues and solutions
+│
+├── .gitignore                          # Git ignore rules
+└── .gitattributes                      # Git attributes for file handling
+```
+
+## Important Notes
+
+### Data Folders (Not Included in Repository)
+
+These folders are created automatically when Docker containers start and contain runtime data:
+
+- **nodered_data/** - Node-RED flow data and credentials
+- **influxdb_data/** - InfluxDB time-series database files
+- **grafana_data/** - Grafana dashboard configurations and database
+
+These folders are excluded from the repository (.gitignore) because they contain:
+- Sensitive credentials (Telegram bot tokens, API keys)
+- Large database files
+- Environment-specific configurations
+
+### Security Considerations
+
+When deploying this system:
+
+1. Change default passwords in docker-compose.yml:
+   - InfluxDB admin password
+   - Grafana admin password
+
+2. Do not commit sensitive data:
+   - Telegram bot tokens
+   - API keys
+   - Database credentials
+   - flows_cred.json file
+
+3. Use environment variables for production deployment
+
+### Model Files
+
+All ML model files are included in the repository:
+- LSTM models (.h5 files) - Keras/TensorFlow models
+- SVM model (.pkl file) - Scikit-learn model
+- Scaler (.pkl file) - Feature preprocessing
+
+These models are pre-trained and ready to use. Training scripts are not included in this repository.
+
+## Development
+
+### Running in Development Mode
+
 ```powershell
+# Run ML API with auto-reload
+uvicorn ml_predictor_hybrid:app --reload --host 0.0.0.0 --port 8000
+
+# View Docker logs
+docker logs -f nodered
+docker logs -f influxdb
+docker logs -f grafana
+
+# Stop all services
+docker-compose down
+
+# Restart services
+docker-compose restart
+```
+
+### Testing the API
+
+Use the FastAPI auto-generated documentation:
+- Interactive API docs: http://localhost:8000/docs
+- Alternative docs: http://localhost:8000/redoc
+
+## Troubleshooting
+
+### API Server Not Starting
+
+```powershell
+# Reinstall dependencies
 pip install -r requirements.txt --upgrade
-python ml_predictor_hybrid.py
+
+# Check Python version
+python --version  # Should be 3.10+
 ```
 
-**No data in Grafana:**
-- Wait 3-4 minutes for data collection
-- Check InfluxDB: `curl http://localhost:8086/query?db=gasdb&q=SHOW+MEASUREMENTS`
-- Verify Node-RED flow is deployed
+### No Data in Grafana
 
-**Docker issues:**
+- Wait 3-4 minutes after starting for data collection to begin
+- Verify Node-RED flow is deployed
+- Check InfluxDB data:
 ```powershell
+curl "http://localhost:8086/query?db=gasdb&q=SHOW+MEASUREMENTS"
+```
+
+### Docker Container Issues
+
+```powershell
+# View container status
+docker ps -a
+
+# Restart Docker Desktop
+# Then restart containers
 docker-compose down
 docker-compose up -d
 ```
 
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more solutions.
+For more detailed troubleshooting, see TROUBLESHOOTING.md
 
-## 📚 Documentation
+## Documentation
 
-- **[SETUP-GUIDE.md](SETUP-GUIDE.md)** - Complete installation guide
-- **[DEVELOPER.md](DEVELOPER.md)** - Architecture and API details
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and fixes
+- **SETUP-GUIDE.md** - Complete installation and configuration guide
+- **DEVELOPER.md** - System architecture and API documentation
+- **TROUBLESHOOTING.md** - Common problems and solutions
 
-## 🎯 Features
-
-✅ Hybrid ML: LSTM regression + SVM classification  
-✅ Real-time predictions (every 10s)  
-✅ Multi-tier alerts (NORMAL/WARNING/DANGER)  
-✅ Interactive Grafana dashboard  
-✅ Telegram notifications  
-✅ Docker containerized  
-✅ FastAPI with auto-reload  
-
-## 📄 License
+## License
 
 MIT License
 
-## 🤝 Contributing
+## Author
 
-Pull requests are welcome! For major changes, please open an issue first.
+DongQuach1804
 
----
+## Repository
 
-**Made with ❤️ for IoT monitoring**
+https://github.com/DongQuach1804/gas-dashboard
