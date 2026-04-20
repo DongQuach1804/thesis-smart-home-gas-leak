@@ -1,0 +1,18 @@
+# ── Core Spark streaming ───────────────────────────────────────────────────────
+pyspark==3.5.1
+
+# ── LSTM inference (use CPU-only tensorflow to avoid the ~2.5 GB CUDA packages)
+tensorflow-cpu==2.16.1
+keras==3.3.3
+
+# ── Numerics ───────────────────────────────────────────────────────────────────
+numpy==1.26.4
+
+# ── InfluxDB 2.x writer ────────────────────────────────────────────────────────
+influxdb-client==1.43.0
+
+# ── Kafka producer (for alert publishing) ─────────────────────────────────────
+kafka-python==2.0.2
+
+# ── Env loading ────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
