@@ -60,6 +60,13 @@ function Push-LeanBranch {
     # Always return to main first
     Invoke-Git checkout main --quiet
 
+    # Delete local branch if it already exists (safe to re-run)
+    $exists = git branch --list $Branch
+    if ($exists) {
+        git branch -D $Branch --quiet 2>$null | Out-Null
+        Write-OK "  deleted existing local branch: $Branch"
+    }
+
     # Create a brand-new orphan branch (no history)
     Invoke-Git checkout --orphan $Branch --quiet
 
