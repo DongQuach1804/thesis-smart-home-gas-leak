@@ -1,0 +1,119 @@
+# =============================================
+# Runtime Data / Docker Volumes
+# =============================================
+nodered_data/
+influxdb_data/
+grafana_data/
+postgres_data/
+kafka_data/
+zookeeper_data/
+
+# =============================================
+# Security & Credentials
+# =============================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.crt
+*_credentials.json
+flows_cred.json
+secrets/
+credentials/
+
+# =============================================
+# Node.js / Frontend & Backend
+# =============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.pnp.*
+dist/
+build/
+.next/
+out/
+
+# =============================================
+# Python
+# =============================================
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.coveragerc
+
+# =============================================
+# Machine Learning / Model Artifacts
+# =============================================
+*.h5
+*.keras
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.pb
+models/saved/
+models/checkpoints/
+data/raw/
+data/processed/
+spark-output/
+checkpoints/
+
+# =============================================
+# Java / Scala / Spark
+# =============================================
+*.class
+*.jar
+target/
+.metals/
+.bloop/
+
+# =============================================
+# IDEs
+# =============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================
+# OS
+# =============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =============================================
+# Logs & Temp
+# =============================================
+*.log
+logs/
+tmp/
+temp/
+.lh/
