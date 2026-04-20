@@ -44,7 +44,7 @@ if ($dirty) {
 
 # ── Step 2: Push main ─────────────────────────────────────────────────────────
 Write-Step "2 / 9 — Pushing main"
-Invoke-Git push -u origin main --allow-unrelated-histories --force
+Invoke-Git push -u origin main --force
 Write-OK "main → origin/main"
 
 # ── Helper: orphan branch with only requested paths ───────────────────────────
