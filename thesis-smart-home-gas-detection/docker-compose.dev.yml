@@ -1,0 +1,28 @@
+services:
+  backend:
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ./application/backend/src:/app/src   # hot-reload source only
+    environment:
+      - NODE_ENV=development
+      - INFLUXDB_URL=http://influxdb:8086
+      - KAFKA_BROKER=kafka:9092
+      - POSTGRES_HOST=postgres
+
+  frontend:
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ./application/frontend/views:/app/views     # hot-reload views
+      - ./application/frontend/public:/app/public   # hot-reload static assets
+    environment:
+      # Browser-accessible backend URL
+      - BACKEND_BASE_URL=http://localhost:3000
+
+  mqtt-kafka-bridge:
+    volumes:
+      - ./communication/bridges:/app/communication/bridges
+
+  processing-engine:
+    command: ["python", "spark-streaming/jobs/stream_processor.py"]
+    volumes:
+      - ./processing:/app

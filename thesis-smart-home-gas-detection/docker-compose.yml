@@ -1,0 +1,238 @@
+name: thesis-gas-detection
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infrastructure/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  kafka:
+    image: apache/kafka:3.9.2        # Official Apache Kafka image (bitnami removed from Docker Hub)
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093" # external (host) listener
+    environment:
+      # KRaft mode (no ZooKeeper)
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,EXTERNAL://:9093,CONTROLLER://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9094
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      # ── Session timeout limits (must accommodate KafkaJS sessionTimeout=45000) ──
+      - KAFKA_GROUP_MIN_SESSION_TIMEOUT_MS=6000
+      - KAFKA_GROUP_MAX_SESSION_TIMEOUT_MS=60000
+      # ── Prevent idle connections from being closed before heartbeat ──
+      - KAFKA_CONNECTIONS_MAX_IDLE_MS=600000
+      # ── Log retention (dev only — keep 6h to avoid disk fill) ──
+      - KAFKA_LOG_RETENTION_HOURS=6
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list" ]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  influxdb:
+    image: influxdb:2.7.6
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET_GAS}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8086/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  postgres:
+    image: postgres:16.3
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgresql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123456
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  mqtt-kafka-bridge:
+    build:
+      context: .
+      dockerfile: deploy/docker/communication/Dockerfile
+    container_name: mqtt-kafka-bridge
+    env_file:
+      - .env
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - MQTT_BROKER_HOST=mosquitto
+    depends_on:
+      mosquitto:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  device-simulator:
+    build:
+      context: .
+      dockerfile: deploy/docker/device/Dockerfile
+    container_name: device-simulator
+    env_file:
+      - .env
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+    depends_on:
+      mosquitto:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  # NOTE: spark-master and spark-worker are NOT needed.
+  # processing-engine uses embedded local Spark (.master("local[*]")),
+  # so no external Spark cluster is required.
+
+  processing-engine:
+    build:
+      context: .
+      dockerfile: deploy/docker/processing/Dockerfile
+    container_name: processing-engine
+    env_file:
+      - .env
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - INFLUXDB_URL=http://influxdb:8086
+      - LSTM_MODEL_PATH=/app/ml/lstm/best_lstm_uci.keras
+      - LSTM_ALERT_THRESHOLD=0.7
+      - LSTM_WARNING_THRESHOLD=0.4
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./processing:/app
+    command: [ "python", "spark-streaming/jobs/stream_processor.py" ]
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend/Dockerfile
+    container_name: backend
+    env_file:
+      - .env
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - KAFKA_BROKER=kafka:9092
+      - POSTGRES_HOST=postgres
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend/Dockerfile
+    container_name: frontend
+    environment:
+      # Must be reachable FROM THE BROWSER (host machine), not from inside Docker
+      - BACKEND_BASE_URL=http://localhost:3000
+      - FRONTEND_PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - iot_net
+
+networks:
+  iot_net:
+    driver: bridge
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  kafka_data:
+  influxdb_data:
+  postgres_data:
+  grafana_data:

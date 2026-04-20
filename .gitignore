@@ -1,11 +1,19 @@
-# Data folders (runtime data)
+# =============================================
+# Runtime Data / Docker Volumes
+# =============================================
 nodered_data/
 influxdb_data/
 grafana_data/
+postgres_data/
+kafka_data/
+zookeeper_data/
 
+# =============================================
 # Security & Credentials
+# =============================================
 .env
-.env.*
+.env.local
+.env.*.local
 *.key
 *.pem
 *.crt
@@ -14,29 +22,37 @@ flows_cred.json
 secrets/
 credentials/
 
-# Local history
-.lh/
+# =============================================
+# Node.js / Frontend & Backend
+# =============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.pnp.*
+dist/
+build/
+.next/
+out/
 
-# Python virtual environment
+# =============================================
+# Python
+# =============================================
 .venv/
 venv/
-
-# Python
+env/
+ENV/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -45,17 +61,59 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.coveragerc
 
+# =============================================
+# Machine Learning / Model Artifacts
+# =============================================
+*.h5
+*.keras
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.pb
+models/saved/
+models/checkpoints/
+data/raw/
+data/processed/
+spark-output/
+checkpoints/
+
+# =============================================
+# Java / Scala / Spark
+# =============================================
+*.class
+*.jar
+target/
+.metals/
+.bloop/
+
+# =============================================
 # IDEs
+# =============================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
+# =============================================
 # OS
+# =============================================
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Logs
+# =============================================
+# Logs & Temp
+# =============================================
 *.log
+logs/
+tmp/
+temp/
+.lh/
