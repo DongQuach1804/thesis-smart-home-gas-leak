@@ -3,360 +3,291 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Smart Home Gas Leak Monitor</title>
-    <meta name="description" content="Real-time gas leak detection dashboard with LSTM AI prediction, live sensor data from MQTT/Kafka/Spark pipeline." />
+    <title>Gas Leak Intelligence — Smart Home Dashboard</title>
+    <meta name="description" content="Real-time gas leak detection dashboard with LSTM AI prediction, live sensor telemetry from MQTT → Kafka → Spark → InfluxDB." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/css/main.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   </head>
-  <body>
+  <body data-theme="dark">
 
-    <!-- ─── Header ─────────────────────────────────────────────────────────── -->
-    <header class="top-bar">
-      <div class="top-bar__brand">
-        <span class="top-bar__icon">🔥</span>
-        <span class="top-bar__title">Gas Leak Intelligence</span>
+    <!-- ─── Sidebar nav ────────────────────────────────────────────────────── -->
+    <nav class="sidenav">
+      <div class="sidenav__brand">
+        <span class="sidenav__icon">🔥</span>
+        <div>
+          <div class="sidenav__title">Gas Intel</div>
+          <div class="sidenav__sub">v<%= appVersion %></div>
+        </div>
       </div>
-      <div class="top-bar__meta">
-        <span class="badge badge--system" id="badge-pipeline">● pipeline</span>
-        <span class="top-bar__clock" id="clock">--:--:--</span>
+
+      <ul class="sidenav__menu">
+        <li><a href="#view-overview"  class="navlink is-active" data-view="overview">📊 <span>Overview</span></a></li>
+        <li><a href="#view-devices"   class="navlink"           data-view="devices">📡 <span>Devices</span></a></li>
+        <li><a href="#view-alerts"    class="navlink"           data-view="alerts">🚨 <span>Alerts</span></a></li>
+        <li><a href="#view-analytics" class="navlink"           data-view="analytics">📈 <span>Analytics</span></a></li>
+      </ul>
+
+      <div class="sidenav__footer">
+        <div class="sidenav__pipeline" id="sidenav-pipeline">
+          <div class="dot dot--up" title="MQTT"></div>
+          <div class="dot dot--up" title="Kafka"></div>
+          <div class="dot dot--up" title="Spark"></div>
+          <div class="dot dot--up" title="InfluxDB"></div>
+        </div>
+        <div class="sidenav__hint">All systems nominal</div>
       </div>
-    </header>
+    </nav>
 
-    <!-- ─── Main layout ─────────────────────────────────────────────────────── -->
-    <main class="layout">
+    <!-- ─── Main column ─────────────────────────────────────────────────────── -->
+    <div class="app">
 
-      <!-- Left column: KPI cards + alert feed -->
-      <aside class="sidebar">
-
-        <!-- Risk gauge card -->
-        <div class="card card--risk" id="card-risk">
-          <div class="card__label">LSTM Risk Score</div>
-          <div class="risk-gauge">
-            <svg viewBox="0 0 120 80" class="gauge-svg" id="gauge-svg">
-              <!-- background arc -->
-              <path d="M10 70 A55 55 0 0 1 110 70" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round"/>
-              <!-- value arc -->
-              <path class="gauge-arc" id="gauge-arc"
-                    d="M10 70 A55 55 0 0 1 110 70"
-                    fill="none" stroke="#22c55e" stroke-width="10"
-                    stroke-linecap="round" stroke-dasharray="172.8" stroke-dashoffset="172.8"/>
-            </svg>
-            <div class="gauge-value" id="gauge-value">0.00</div>
-          </div>
-          <div class="badge badge--label" id="risk-label">NORMAL</div>
+      <!-- Top bar -->
+      <header class="top-bar">
+        <div class="top-bar__left">
+          <h1 class="top-bar__heading" id="view-title">Overview</h1>
+          <span class="badge badge--system" id="badge-pipeline">● connecting</span>
         </div>
 
-        <!-- Sensor KPI cards -->
-        <div class="kpi-grid">
-          <div class="card kpi" id="kpi-gas">
-            <div class="kpi__icon">💨</div>
-            <div class="kpi__body">
-              <div class="kpi__value" id="kpi-gas-val">—</div>
-              <div class="kpi__unit">ppm</div>
-              <div class="kpi__label">Gas Concentration</div>
-            </div>
+        <div class="top-bar__controls">
+          <label class="control">
+            <span class="control__label">Device</span>
+            <select id="device-select">
+              <option value="">All devices</option>
+            </select>
+          </label>
+
+          <div class="seg-control" id="range-control" role="tablist" aria-label="Time range">
+            <button data-range="15"   role="tab">15m</button>
+            <button data-range="30"   role="tab" class="is-active">30m</button>
+            <button data-range="60"   role="tab">1h</button>
+            <button data-range="360"  role="tab">6h</button>
+            <button data-range="1440" role="tab">24h</button>
           </div>
-          <div class="card kpi" id="kpi-temp">
-            <div class="kpi__icon">🌡️</div>
-            <div class="kpi__body">
-              <div class="kpi__value" id="kpi-temp-val">—</div>
-              <div class="kpi__unit">°C</div>
-              <div class="kpi__label">Temperature</div>
-            </div>
-          </div>
-          <div class="card kpi" id="kpi-hum">
-            <div class="kpi__icon">💧</div>
-            <div class="kpi__body">
-              <div class="kpi__value" id="kpi-hum-val">—</div>
-              <div class="kpi__unit">%</div>
-              <div class="kpi__label">Humidity</div>
-            </div>
-          </div>
-          <div class="card kpi" id="kpi-device">
-            <div class="kpi__icon">📡</div>
-            <div class="kpi__body">
-              <div class="kpi__value kpi__value--sm" id="kpi-device-val">—</div>
-              <div class="kpi__label">Device ID</div>
-            </div>
-          </div>
+
+          <div class="top-bar__clock" id="clock">--:--:--</div>
         </div>
+      </header>
 
-        <!-- Alert feed -->
-        <div class="card card--alerts">
-          <div class="card__label">🚨 Alert Feed <span class="badge badge--live">LIVE</span></div>
-          <ul class="alert-list" id="alert-list">
-            <li class="alert-list__empty">Waiting for alerts…</li>
-          </ul>
-        </div>
+      <main class="content">
 
-      </aside>
+        <!-- ─── Overview view ──────────────────────────────────────────── -->
+        <section class="view is-active" id="view-overview" data-view="overview">
 
-      <!-- Right column: charts + pipeline status -->
-      <section class="charts-col">
-
-        <!-- Gas PPM chart -->
-        <div class="card card--chart">
-          <div class="card__header">
-            <span class="card__label">Gas Concentration (ppm)</span>
-            <span class="badge badge--live">LIVE</span>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="chart-gas"></canvas>
-          </div>
-        </div>
-
-        <!-- LSTM risk score chart -->
-        <div class="card card--chart">
-          <div class="card__header">
-            <span class="card__label">LSTM Risk Score</span>
-            <span class="badge badge--ai">AI</span>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="chart-risk"></canvas>
-          </div>
-        </div>
-
-        <!-- Pipeline status -->
-        <div class="card card--pipeline">
-          <div class="card__label">Pipeline Status</div>
-          <div class="pipeline-grid">
-            <div class="pipeline-step" id="ps-mqtt">
-              <div class="pipeline-step__dot"></div>
-              <div class="pipeline-step__name">MQTT</div>
-              <div class="pipeline-step__sub">Mosquitto</div>
+          <!-- KPI strip -->
+          <div class="stat-grid">
+            <div class="stat-card stat-card--accent" id="stat-risk">
+              <div class="stat-card__top">
+                <span class="stat-card__label">LSTM Risk Score</span>
+                <span class="badge badge--ai">AI</span>
+              </div>
+              <div class="risk-gauge">
+                <svg viewBox="0 0 120 80" class="gauge-svg">
+                  <path d="M10 70 A55 55 0 0 1 110 70" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-linecap="round"/>
+                  <path class="gauge-arc" id="gauge-arc"
+                        d="M10 70 A55 55 0 0 1 110 70"
+                        fill="none" stroke="#22c55e" stroke-width="10"
+                        stroke-linecap="round" stroke-dasharray="172.8" stroke-dashoffset="172.8"/>
+                </svg>
+                <div class="gauge-value" id="gauge-value">0.0000</div>
+              </div>
+              <div class="badge badge--label badge--normal" id="risk-label">NORMAL</div>
             </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step" id="ps-kafka">
-              <div class="pipeline-step__dot"></div>
-              <div class="pipeline-step__name">Kafka</div>
-              <div class="pipeline-step__sub">gas.raw.sensor</div>
+
+            <div class="stat-card" id="kpi-gas">
+              <div class="stat-card__top">
+                <span class="stat-card__label">Gas Concentration</span>
+                <span class="stat-card__icon">💨</span>
+              </div>
+              <div class="stat-card__value"><span id="kpi-gas-val">—</span><span class="stat-card__unit">ppm</span></div>
+              <div class="stat-card__sub" id="kpi-gas-sub">Awaiting telemetry…</div>
+              <div class="spark"><canvas id="spark-gas"></canvas></div>
             </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step" id="ps-spark">
-              <div class="pipeline-step__dot"></div>
-              <div class="pipeline-step__name">Spark</div>
-              <div class="pipeline-step__sub">Stream Processor</div>
+
+            <div class="stat-card" id="kpi-temp">
+              <div class="stat-card__top">
+                <span class="stat-card__label">Temperature</span>
+                <span class="stat-card__icon">🌡️</span>
+              </div>
+              <div class="stat-card__value"><span id="kpi-temp-val">—</span><span class="stat-card__unit">°C</span></div>
+              <div class="stat-card__sub" id="kpi-temp-sub">—</div>
+              <div class="spark"><canvas id="spark-temp"></canvas></div>
             </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step" id="ps-lstm">
-              <div class="pipeline-step__dot pipeline-step__dot--ai"></div>
-              <div class="pipeline-step__name">LSTM</div>
-              <div class="pipeline-step__sub">best_lstm_uci.keras</div>
-            </div>
-            <div class="pipeline-arrow">→</div>
-            <div class="pipeline-step" id="ps-influx">
-              <div class="pipeline-step__dot"></div>
-              <div class="pipeline-step__name">InfluxDB</div>
-              <div class="pipeline-step__sub">gas_sensor_data</div>
+
+            <div class="stat-card" id="kpi-hum">
+              <div class="stat-card__top">
+                <span class="stat-card__label">Humidity</span>
+                <span class="stat-card__icon">💧</span>
+              </div>
+              <div class="stat-card__value"><span id="kpi-hum-val">—</span><span class="stat-card__unit">%</span></div>
+              <div class="stat-card__sub" id="kpi-hum-sub">—</div>
+              <div class="spark"><canvas id="spark-hum"></canvas></div>
             </div>
           </div>
-        </div>
 
-      </section>
-    </main>
+          <!-- Stat row 2 -->
+          <div class="stat-row">
+            <div class="stat-mini"><div class="stat-mini__label">Avg ppm (window)</div><div class="stat-mini__value" id="stat-avg-ppm">—</div></div>
+            <div class="stat-mini"><div class="stat-mini__label">Peak ppm (window)</div><div class="stat-mini__value" id="stat-max-ppm">—</div></div>
+            <div class="stat-mini"><div class="stat-mini__label">Avg risk (window)</div><div class="stat-mini__value" id="stat-avg-risk">—</div></div>
+            <div class="stat-mini"><div class="stat-mini__label">Alerts (24h)</div><div class="stat-mini__value" id="stat-alerts-24h">—</div></div>
+            <div class="stat-mini"><div class="stat-mini__label">Devices online</div><div class="stat-mini__value" id="stat-devices-online">—</div></div>
+          </div>
 
-    <footer class="footer">
-      Thesis — Smart Home Gas Leak Detection · LSTM + Reinforcement Learning · MQTT → Kafka → Spark → InfluxDB
-    </footer>
+          <!-- Charts row -->
+          <div class="card-row">
+            <div class="card card--chart card--wide">
+              <div class="card__header">
+                <span class="card__label">Gas Concentration over time</span>
+                <span class="badge badge--live">LIVE</span>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-gas"></canvas></div>
+            </div>
+            <div class="card card--chart">
+              <div class="card__header">
+                <span class="card__label">LSTM Risk Score</span>
+                <span class="badge badge--ai">AI</span>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-risk"></canvas></div>
+            </div>
+          </div>
+
+          <div class="card-row">
+            <div class="card card--chart">
+              <div class="card__header"><span class="card__label">Temperature & Humidity</span></div>
+              <div class="chart-wrap"><canvas id="chart-th"></canvas></div>
+            </div>
+
+            <div class="card card--alerts">
+              <div class="card__header">
+                <span class="card__label">🚨 Recent Alerts</span>
+                <span class="badge badge--live">LIVE</span>
+              </div>
+              <ul class="alert-list" id="alert-list">
+                <li class="alert-list__empty">Waiting for alerts…</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Pipeline -->
+          <div class="card card--pipeline">
+            <div class="card__label">Pipeline Status</div>
+            <div class="pipeline-grid">
+              <div class="pipeline-step" id="ps-mqtt">
+                <div class="pipeline-step__dot"></div>
+                <div class="pipeline-step__name">MQTT</div>
+                <div class="pipeline-step__sub">Mosquitto</div>
+              </div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-step" id="ps-kafka">
+                <div class="pipeline-step__dot"></div>
+                <div class="pipeline-step__name">Kafka</div>
+                <div class="pipeline-step__sub">gas.raw.sensor</div>
+              </div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-step" id="ps-spark">
+                <div class="pipeline-step__dot"></div>
+                <div class="pipeline-step__name">Spark</div>
+                <div class="pipeline-step__sub">Stream Processor</div>
+              </div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-step" id="ps-lstm">
+                <div class="pipeline-step__dot pipeline-step__dot--ai"></div>
+                <div class="pipeline-step__name">LSTM</div>
+                <div class="pipeline-step__sub">best_lstm_uci.keras</div>
+              </div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-step" id="ps-influx">
+                <div class="pipeline-step__dot"></div>
+                <div class="pipeline-step__name">InfluxDB</div>
+                <div class="pipeline-step__sub">gas_sensor_data</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Devices view ───────────────────────────────────────────── -->
+        <section class="view" id="view-devices" data-view="devices">
+          <div class="card">
+            <div class="card__header">
+              <span class="card__label">Registered Devices</span>
+              <span class="card__hint" id="devices-count">—</span>
+            </div>
+            <div class="device-grid" id="device-grid">
+              <div class="device-grid__empty">Loading devices…</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Alerts view ────────────────────────────────────────────── -->
+        <section class="view" id="view-alerts" data-view="alerts">
+          <div class="card">
+            <div class="card__header">
+              <span class="card__label">Alert History (24h)</span>
+              <span class="card__hint"><span id="alerts-count">0</span> events</span>
+            </div>
+            <div class="table-wrap">
+              <table class="alerts-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Device</th>
+                    <th>Label</th>
+                    <th class="num">Gas (ppm)</th>
+                    <th class="num">Risk</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="alerts-tbody">
+                  <tr><td colspan="6" class="alerts-table__empty">No alerts in the last 24 hours.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── Analytics view ─────────────────────────────────────────── -->
+        <section class="view" id="view-analytics" data-view="analytics">
+          <div class="card-row">
+            <div class="card card--chart card--wide">
+              <div class="card__header"><span class="card__label">Risk Score Distribution (window)</span></div>
+              <div class="chart-wrap"><canvas id="chart-risk-hist"></canvas></div>
+            </div>
+            <div class="card card--chart">
+              <div class="card__header"><span class="card__label">Label Breakdown</span></div>
+              <div class="chart-wrap"><canvas id="chart-label-pie"></canvas></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__label">Window Stats</div>
+            <div class="stat-row">
+              <div class="stat-mini"><div class="stat-mini__label">Samples</div><div class="stat-mini__value" id="an-count">—</div></div>
+              <div class="stat-mini"><div class="stat-mini__label">Min ppm</div><div class="stat-mini__value" id="an-min">—</div></div>
+              <div class="stat-mini"><div class="stat-mini__label">Avg ppm</div><div class="stat-mini__value" id="an-avg">—</div></div>
+              <div class="stat-mini"><div class="stat-mini__label">Max ppm</div><div class="stat-mini__value" id="an-max">—</div></div>
+              <div class="stat-mini"><div class="stat-mini__label">Avg risk</div><div class="stat-mini__value" id="an-risk">—</div></div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <footer class="footer">
+        Thesis · Smart Home Gas Leak Detection · LSTM + Reinforcement Learning · MQTT → Kafka → Spark → InfluxDB
+      </footer>
+    </div>
+
+    <!-- toast container -->
+    <div class="toasts" id="toasts" aria-live="polite"></div>
 
     <script>
-    (() => {
-      // ─── Config ────────────────────────────────────────────────────────────
-      const API = "<%= backendBaseUrl %>/api";
-      const POLL_MS      = 3000;   // latest reading poll interval
-      const HISTORY_MINS = 30;
-      const MAX_CHART_PTS = 60;
-
-      // risk label → CSS class & colour
-      const RISK_META = {
-        NORMAL:  { cls: "badge--normal",  hex: "#22c55e" },
-        WARNING: { cls: "badge--warning", hex: "#f59e0b" },
-        ALERT:   { cls: "badge--alert",   hex: "#ef4444" },
+      window.__APP_CONFIG__ = {
+        api: "<%= backendBaseUrl %>/api",
       };
-
-      // ─── Clock ─────────────────────────────────────────────────────────────
-      (function clock() {
-        const el = document.getElementById("clock");
-        setInterval(() => {
-          el.textContent = new Date().toLocaleTimeString("vi-VN", { hour12: false });
-        }, 1000);
-      })();
-
-      // ─── Gauge ─────────────────────────────────────────────────────────────
-      const GAUGE_LEN = 172.8;  // arc length for score = 1.0
-      function setGauge(score, label) {
-        const arc   = document.getElementById("gauge-arc");
-        const val   = document.getElementById("gauge-value");
-        const card  = document.getElementById("card-risk");
-        const badge = document.getElementById("risk-label");
-        const meta  = RISK_META[label] || RISK_META.NORMAL;
-
-        const offset = GAUGE_LEN * (1 - Math.min(score, 1));
-        arc.style.strokeDashoffset = offset;
-        arc.style.stroke = meta.hex;
-        val.textContent  = score.toFixed(4);
-        val.style.color  = meta.hex;
-        card.dataset.risk = label;
-        badge.className  = "badge badge--label " + meta.cls;
-        badge.textContent = label;
-      }
-
-      // ─── KPI updater ───────────────────────────────────────────────────────
-      function updateKpis(d) {
-        document.getElementById("kpi-gas-val").textContent    = d.gasPpm?.toFixed(1)       ?? "—";
-        document.getElementById("kpi-temp-val").textContent   = d.temperatureC?.toFixed(1)  ?? "—";
-        document.getElementById("kpi-hum-val").textContent    = d.humidityPercent?.toFixed(1) ?? "—";
-        document.getElementById("kpi-device-val").textContent = d.deviceId ?? "—";
-        document.getElementById("badge-pipeline").className   = "badge badge--system badge--normal";
-
-        // Gas card colour
-        const gasCard = document.getElementById("kpi-gas");
-        const gas = d.gasPpm ?? 0;
-        gasCard.className = gas > 700 ? "card kpi kpi--danger" : gas > 400 ? "card kpi kpi--warn" : "card kpi";
-      }
-
-      // ─── Charts ────────────────────────────────────────────────────────────
-      const chartDefaults = (label, color) => ({
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [{
-            label,
-            data: [],
-            borderColor: color,
-            backgroundColor: color + "22",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.35,
-            fill: true,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: false,
-          scales: {
-            x: {
-              ticks: { color: "#94a3b8", font: { family: "JetBrains Mono", size: 10 }, maxTicksLimit: 8 },
-              grid:  { color: "rgba(255,255,255,0.04)" },
-            },
-            y: {
-              ticks: { color: "#94a3b8", font: { family: "JetBrains Mono", size: 10 } },
-              grid:  { color: "rgba(255,255,255,0.04)" },
-            }
-          },
-          plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
-        }
-      });
-
-      const gasChart  = new Chart(document.getElementById("chart-gas"),  chartDefaults("Gas (ppm)",   "#38bdf8"));
-      const riskChart = new Chart(document.getElementById("chart-risk"), chartDefaults("Risk Score",  "#a78bfa"));
-
-      function pushPoint(chart, label, value, max) {
-        chart.data.labels.push(label);
-        chart.data.datasets[0].data.push(value);
-        if (chart.data.labels.length > max) {
-          chart.data.labels.shift();
-          chart.data.datasets[0].data.shift();
-        }
-        chart.update("none");
-      }
-
-      // ─── Load history on start ─────────────────────────────────────────────
-      fetch(`${API}/dashboard/history?minutes=${HISTORY_MINS}&sample_every=15`)
-        .then(r => r.json())
-        .then(rows => {
-          rows.forEach(r => {
-            const t = new Date(r.ts).toLocaleTimeString("vi-VN", { hour12: false });
-            pushPoint(gasChart,  t, r.gasPpm,        MAX_CHART_PTS);
-            pushPoint(riskChart, t, r.lstmRiskScore,  MAX_CHART_PTS);
-          });
-        })
-        .catch(() => console.warn("[history] InfluxDB not reachable yet"));
-
-      // ─── Poll latest reading ───────────────────────────────────────────────
-      async function pollLatest() {
-        try {
-          const r = await fetch(`${API}/dashboard/latest`);
-          const d = await r.json();
-          if (r.ok && d && d.gasPpm !== undefined) {
-            const t = new Date(d.ts).toLocaleTimeString("vi-VN", { hour12: false });
-            updateKpis(d);
-            setGauge(d.lstmRiskScore ?? 0, d.riskLabel ?? "NORMAL");
-            pushPoint(gasChart,  t, d.gasPpm,        MAX_CHART_PTS);
-            pushPoint(riskChart, t, d.lstmRiskScore,  MAX_CHART_PTS);
-          }
-        } catch {
-          document.getElementById("badge-pipeline").className = "badge badge--system badge--alert";
-        }
-      }
-      pollLatest();
-      setInterval(pollLatest, POLL_MS);
-
-      // ─── SSE alert stream ──────────────────────────────────────────────────
-      (function initSSE() {
-        const list = document.getElementById("alert-list");
-        const MAX_ALERTS = 20;
-
-        function appendAlert(a) {
-          const empty = list.querySelector(".alert-list__empty");
-          if (empty) empty.remove();
-
-          const meta  = RISK_META[a.riskLabel] || RISK_META.NORMAL;
-          const li    = document.createElement("li");
-          const ts    = new Date(a.eventTs).toLocaleTimeString("vi-VN", { hour12: false });
-          li.className = "alert-item alert-item--" + a.riskLabel.toLowerCase();
-          li.innerHTML = `
-            <span class="alert-item__dot" style="background:${meta.hex}"></span>
-            <span class="alert-item__body">
-              <strong>${a.riskLabel}</strong> · ${a.deviceId}<br/>
-              <span class="mono">${a.gasPpm.toFixed(1)} ppm · risk ${a.riskScore.toFixed(4)}</span>
-            </span>
-            <span class="alert-item__time">${ts}</span>`;
-          list.prepend(li);
-          while (list.children.length > MAX_ALERTS) list.lastChild.remove();
-
-          // Flash the risk card
-          document.getElementById("card-risk").classList.add("card--flash");
-          setTimeout(() => document.getElementById("card-risk").classList.remove("card--flash"), 600);
-        }
-
-        try {
-          const sse = new EventSource(`${API}/dashboard/alerts/stream`);
-          sse.onmessage = (e) => appendAlert(JSON.parse(e.data));
-          sse.onerror   = () => setTimeout(initSSE, 5000);
-        } catch {
-          console.warn("[SSE] EventSource not available");
-        }
-      })();
-
-      // ─── Pipeline status poll ──────────────────────────────────────────────
-      function pollOverview() {
-        fetch(`${API}/dashboard/overview`)
-          .then(r => r.json())
-          .then(d => {
-            const steps = { mqtt: "ps-mqtt", kafka: "ps-kafka", spark: "ps-spark", influxdb: "ps-influx" };
-            Object.entries(steps).forEach(([svc, id]) => {
-              const el = document.getElementById(id);
-              if (!el) return;
-              const dot = el.querySelector(".pipeline-step__dot");
-              const up  = d.services?.[svc] === "up";
-              dot.classList.toggle("pipeline-step__dot--up",   up);
-              dot.classList.toggle("pipeline-step__dot--down", !up);
-            });
-            // LSTM always shows active once model loaded
-            const lstmDot = document.querySelector("#ps-lstm .pipeline-step__dot");
-            if (lstmDot) lstmDot.classList.add("pipeline-step__dot--up");
-          })
-          .catch(() => {});
-      }
-      pollOverview();
-      setInterval(pollOverview, 15_000);
-
-    })();
     </script>
+    <script src="/js/dashboard.js"></script>
   </body>
 </html>

@@ -10,6 +10,7 @@
 import { Kafka, Consumer, EachMessagePayload, logLevel } from "kafkajs";
 import EventEmitter from "events";
 import { env } from "../config/env";
+import { alertStore } from "./alert-store.service";
 
 export interface AlertEvent {
   deviceId:  string;
@@ -22,6 +23,10 @@ export interface AlertEvent {
 class KafkaAlertConsumer extends EventEmitter {
   private consumer: Consumer | null = null;
   private running = false;
+
+  isRunning(): boolean {
+    return this.running;
+  }
 
   async start(): Promise<void> {
     if (this.running) return;
@@ -73,6 +78,7 @@ class KafkaAlertConsumer extends EventEmitter {
               riskLabel: payload.risk_label  ?? "ALERT",
               eventTs:   Number(payload.event_ts  ?? Date.now()),
             };
+            alertStore.push(alert);
             this.emit("alert", alert);
           } catch {
             // malformed message — ignore

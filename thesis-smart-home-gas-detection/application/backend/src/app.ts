@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { apiRouter } from "./routes";
+import { requestLogger } from "./middleware/logger";
+import { errorHandler, notFound } from "./middleware/error";
 
 export const app = express();
 
@@ -9,18 +11,13 @@ export const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
-// Build the allow-list: always include localhost and Docker-internal frontend,
-// plus any extra origin from the environment variable (e.g. remote server IP).
 const corsOrigins: string[] = [
   "http://localhost:8080",
   "http://localhost:3000",
   "http://frontend:8080",
 ];
-
 const extraOrigin = process.env.BACKEND_BASE_URL;
-if (extraOrigin && extraOrigin.startsWith("http")) {
-  corsOrigins.push(extraOrigin);
-}
+if (extraOrigin && extraOrigin.startsWith("http")) corsOrigins.push(extraOrigin);
 
 app.use(cors({
   origin: corsOrigins,
@@ -29,17 +26,21 @@ app.use(cors({
   credentials: true,
 }));
 
-// ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json());
+app.use(requestLogger);
 
 // ── Health endpoint ───────────────────────────────────────────────────────────
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status:  "ok",
     service: "gas-detection-backend",
+    uptime:  process.uptime(),
     ts:      new Date().toISOString(),
   });
 });
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use("/api", apiRouter);
+
+app.use(notFound);
+app.use(errorHandler);
