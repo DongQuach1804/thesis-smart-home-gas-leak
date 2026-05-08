@@ -1,6 +1,7 @@
 FROM python:3.11.9-slim
 
 WORKDIR /app
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 # ── System deps: Java (required by PySpark) ───────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,7 +16,24 @@ ENV PYSPARK_PYTHON=python3
 # ── Python dependencies ───────────────────────────────────────────────────────
 # Copy requirements first for Docker layer caching
 COPY processing/requirements-processing.txt /tmp/requirements-processing.txt
-RUN pip install --no-cache-dir --timeout=120 -r /tmp/requirements-processing.txt
+
+# Upgrade pip first to fix hash-validation bugs in pip 24.0
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Install torch CPU-only BEFORE main requirements (avoids 4GB CUDA download
+# that stable-baselines3 would otherwise trigger)
+RUN python -m pip install --no-cache-dir \
+    torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Use isolated mode + explicit index to avoid hash mismatches from external pip config/mirrors.
+RUN python -m pip --isolated install --no-cache-dir \
+   --index-url ${PIP_INDEX_URL} \
+   --trusted-host pypi.org \
+   --trusted-host files.pythonhosted.org \
+   --timeout=120 \
+   --retries=10 \
+   --prefer-binary \
+   -r /tmp/requirements-processing.txt
 
 # ── Download Spark-Kafka connector JARs ───────────────────────────────────────
 # These are needed for pyspark readStream.format("kafka") to work.
