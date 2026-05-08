@@ -16,3 +16,7 @@ kafka-python==2.0.2
 
 # ── Env loading ────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
+
+# ── Reinforcement learning (PPO controller + Gym env) ─────────────────────────
+gymnasium==0.29.1
+stable-baselines3==2.3.2
