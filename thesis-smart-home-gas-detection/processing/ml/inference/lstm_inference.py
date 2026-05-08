@@ -4,17 +4,21 @@ LSTM Inference module for gas leak risk prediction.
 Loads a Keras `.keras` model and runs inference on a sliding window
 of sensor readings per device. Input shape is auto-detected from the
 model at load time.
+
+Note: tensorflow and numpy are imported lazily inside LSTMInference.__init__
+so that helper functions (_normalise, FEATURES, FEATURE_BOUNDS) can be used
+and the module can be imported without TensorFlow being installed.
 """
 from __future__ import annotations
 
 import logging
 import os
+from contextlib import contextmanager
 from collections import deque
 from pathlib import Path
-from typing import Deque, Dict, Tuple
+from typing import Deque, Dict, List, Tuple
 
-import numpy as np
-import tensorflow as tf
+import numpy as np  # numpy 2.x — available on Python 3.14 via pre-built wheel
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,31 @@ def _normalise(value: float, feat: str) -> float:
     return float(np.clip((value - lo) / (hi - lo + 1e-8), 0.0, 1.0))
 
 
+@contextmanager
+def _compat_dense_from_config(tf):
+    """Temporarily drop unsupported Dense config keys during model loading."""
+    dense_cls = tf.keras.layers.Dense
+    original_from_config = dense_cls.from_config
+
+    def _patched_from_config(cls, config):
+        config = dict(config)
+        config.pop("quantization_config", None)
+        valid_keys = {
+            "name", "trainable", "dtype", "units", "activation",
+            "use_bias", "kernel_initializer", "bias_initializer",
+            "kernel_regularizer", "bias_regularizer",
+            "activity_regularizer", "kernel_constraint", "bias_constraint",
+        }
+        config = {k: v for k, v in config.items() if k in valid_keys}
+        return original_from_config(config)
+
+    dense_cls.from_config = classmethod(_patched_from_config)
+    try:
+        yield
+    finally:
+        dense_cls.from_config = original_from_config
+
+
 class LSTMInference:
     """Thread-safe LSTM inference wrapper.
 
@@ -52,13 +81,29 @@ class LSTMInference:
                 "/app/ml/lstm/best_lstm_uci.keras",
             )
         path = Path(model_path)
+        # Check path BEFORE importing TF so stub tests work without TF installed
         if not path.exists():
             raise FileNotFoundError(
                 f"LSTM model not found: {model_path}\n"
                 "Set LSTM_MODEL_PATH or place the file at the default location."
             )
+
+        # Lazy TF import — only runs when a real model file is present
+        import tensorflow as tf     # noqa: PLC0415
+
         logger.info("Loading LSTM model from %s", path)
-        self.model: tf.keras.Model = tf.keras.models.load_model(str(path))
+        _custom_objects = {
+            "Orthogonal":  tf.keras.initializers.Orthogonal,
+            "orthogonal":  tf.keras.initializers.Orthogonal,
+            "GlorotUniform": tf.keras.initializers.GlorotUniform,
+            "Zeros":       tf.keras.initializers.Zeros,
+            "Ones":        tf.keras.initializers.Ones,
+        }
+
+        # Keras 3.x can pass extra config keys to Dense when loading older .keras files.
+        # Patch Dense.from_config only for the duration of model loading.
+        with _compat_dense_from_config(tf):
+            self.model = tf.keras.models.load_model(str(path), custom_objects=_custom_objects)
 
         # Auto-detect shape from model input spec
         input_shape = self.model.input_shape  # (None, seq_len, n_features)
@@ -69,7 +114,7 @@ class LSTMInference:
         )
 
         # Per-device sliding window:  device_id -> deque of [n_features] normalised rows
-        self._buffers: Dict[str, Deque[list[float]]] = {}
+        self._buffers: Dict[str, Deque[List[float]]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -105,7 +150,7 @@ class LSTMInference:
             return round(gas_ppm / 2000.0, 4)
 
         x = np.array(list(buf), dtype=np.float32).reshape(1, self.seq_len, self.n_features)
-        y: np.ndarray = self.model.predict(x, verbose=0)
+        y = self.model.predict(x, verbose=0)
         return float(round(float(y[0][0]), 4))
 
     def risk_label(self, score: float) -> str:
