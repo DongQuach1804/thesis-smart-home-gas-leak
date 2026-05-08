@@ -11,7 +11,8 @@ param(
     [switch]$install
 )
 
-$ROOT = $PSScriptRoot
+# Project root = 2 levels above scripts/test/
+$ROOT = (Get-Item $PSScriptRoot).Parent.Parent.FullName
 
 function Write-Step([string]$msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-OK([string]$msg)   { Write-Host "    [OK] $msg" -ForegroundColor Green }
@@ -60,10 +61,21 @@ if (Test-Path $modelPath) {
     if ($LASTEXITCODE -eq 0) {
         python -m pytest -v --tb=short processing/tests/test_lstm_inference.py
         $lstmExit = $LASTEXITCODE
-    } else {
-        Write-Host "    TensorFlow not installed — skipping full LSTM tests" -ForegroundColor Yellow
-        Write-Host "    Install with: pip install tensorflow==2.16.1 keras==3.3.3" -ForegroundColor DarkGray
-        $lstmExit = 0
+        } else {
+        Write-Host "    TensorFlow not installed locally (Python 3.14) — trying Docker..." -ForegroundColor Yellow
+
+        # Check if processing-engine container is running
+        $containerRunning = docker ps --filter "name=processing-engine" --filter "status=running" -q 2>$null
+        if ($containerRunning) {
+            Write-Host "    [Docker] Running LSTM tests inside processing-engine container..." -ForegroundColor Cyan
+            docker exec processing-engine python -m pytest /app/tests/test_lstm_inference.py -v --tb=short
+            $lstmExit = $LASTEXITCODE
+        } else {
+            Write-Host "    Docker container 'processing-engine' not running." -ForegroundColor DarkGray
+            Write-Host "    Start with: docker compose up -d" -ForegroundColor DarkGray
+            Write-Host "    Then run:   docker exec processing-engine python -m pytest /app/tests/test_lstm_inference.py" -ForegroundColor DarkGray
+            $lstmExit = 0  # not a failure — just unavailable
+        }
     }
 } else {
     Write-Host "`n    Model file not found at $modelPath — skipping full LSTM tests" -ForegroundColor Yellow
