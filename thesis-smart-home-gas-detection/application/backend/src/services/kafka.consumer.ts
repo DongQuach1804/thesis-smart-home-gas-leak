@@ -36,15 +36,15 @@ class KafkaAlertConsumer extends EventEmitter {
       brokers:           [env.kafkaBroker],
       // ── Timeouts tuned for apache/kafka KRaft mode ──────────────────────
       connectionTimeout: 15_000,   // ms to wait for TCP connection
-      requestTimeout:    60_000,   // ms before a request is considered timed out
+      requestTimeout:    90_000,   // increased to handle KRaft leader election
       // ── Suppress noisy "Response without match" WARN logs ───────────────
       logLevel:          logLevel.ERROR,
-      // ── Retry with gentle back-off so we don't hammer the broker ────────
+      // ── Limit retries so consumer stops after giving up (not infinite loop) ──
       retry: {
-        initialRetryTime: 3_000,
-        retries:          20,
-        maxRetryTime:     60_000,
-        factor:           1.5,
+        initialRetryTime: 5_000,
+        retries:          5,        // give up after 5 attempts (~2 min total)
+        maxRetryTime:     30_000,
+        factor:           2.0,
       },
     });
 
@@ -55,10 +55,13 @@ class KafkaAlertConsumer extends EventEmitter {
       heartbeatInterval: 5_000,    // send heartbeat every 5 s (must be < sessionTimeout/3)
       // ── Fetch tuning: cap wait so connections don't idle into timeout ───
       maxWaitTimeInMs:   5_000,    // max ms to wait for data before returning empty
-      retry:             { retries: 10 },
+      retry:             { retries: 3 },
     });
 
     try {
+      // Give Kafka broker extra time to be fully ready in Docker
+      await new Promise(resolve => setTimeout(resolve, 5_000));
+
       await this.consumer.connect();
       await this.consumer.subscribe({
         topic:         env.kafkaAlertTopic,
@@ -90,7 +93,7 @@ class KafkaAlertConsumer extends EventEmitter {
       console.log(`[KafkaConsumer] Subscribed to ${env.kafkaAlertTopic}`);
     } catch (err) {
       console.warn(
-        "[KafkaConsumer] Could not connect — alerts disabled:",
+        "[KafkaConsumer] Could not connect after retries — real-time alerts disabled. REST APIs unaffected.",
         (err as Error).message,
       );
     }

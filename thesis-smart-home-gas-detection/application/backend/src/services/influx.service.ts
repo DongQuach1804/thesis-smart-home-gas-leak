@@ -93,8 +93,8 @@ class InfluxService {
         |> range(start: -${minutes}m)
         |> filter(fn: (r) => r._measurement == "gas_reading")
         ${deviceFilter}
-        |> pivot(rowKey: ["_time","device_id","risk_label"], columnKey: ["_field"], valueColumn: "_value")
         |> aggregateWindow(every: ${sampleEvery}s, fn: last, createEmpty: false)
+        |> pivot(rowKey: ["_time","device_id","risk_label"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: false)
     `;
 
