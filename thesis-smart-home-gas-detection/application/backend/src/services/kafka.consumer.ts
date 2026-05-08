@@ -1,26 +1,39 @@
 /**
- * Kafka consumer for gas.alert.events topic.
+ * Kafka consumers for the gas-leak pipeline.
  *
- * Fix for apache/kafka:3.9.x + KafkaJS compatibility:
- *  - KafkaJS defaults cause "Response without match" + JoinGroup timeout loops
- *    against newer Kafka brokers that use Fetch API v11+.
- *  - Fixes: increase requestTimeout, tune session/heartbeat, cap maxWaitTimeInMs,
- *    and use a longer retry back-off so the broker isn't hammered.
+ *   gas.alert.events   — predictive alerts from the forecasting LSTM
+ *   gas.action.events  — actions chosen by the RL controller
+ *
+ * Both topics are mirrored to Postgres so the dashboard / thesis report
+ * can query persistent history.
  */
 import { Kafka, Consumer, EachMessagePayload, logLevel } from "kafkajs";
 import EventEmitter from "events";
 import { env } from "../config/env";
+import { postgresService } from "./postgres.service";
 
 export interface AlertEvent {
-  deviceId:  string;
-  gasPpm:    number;
-  riskScore: number;
-  riskLabel: string;
-  eventTs:   number;
+  deviceId:           string;
+  gasPpm:             number;
+  predictedRisk5Min:  number;     // P(critical in 5 min) from forecaster
+  riskLabel:          string;
+  eventTs:            number;
+  // Legacy alias preserved so existing SSE clients still parse "riskScore"
+  riskScore:          number;
 }
 
-class KafkaAlertConsumer extends EventEmitter {
-  private consumer: Consumer | null = null;
+export interface ActionEvent {
+  deviceId:   string;
+  action:     string;
+  actionId:   number;
+  triggerP5:  number;
+  gasPpm:     number;
+  eventTs:    number;
+}
+
+class KafkaPipelineConsumer extends EventEmitter {
+  private alertConsumer: Consumer | null = null;
+  private actionConsumer: Consumer | null = null;
   private running = false;
 
   async start(): Promise<void> {
@@ -29,12 +42,9 @@ class KafkaAlertConsumer extends EventEmitter {
     const kafka = new Kafka({
       clientId:          "gas-backend",
       brokers:           [env.kafkaBroker],
-      // ── Timeouts tuned for apache/kafka KRaft mode ──────────────────────
-      connectionTimeout: 15_000,   // ms to wait for TCP connection
-      requestTimeout:    60_000,   // ms before a request is considered timed out
-      // ── Suppress noisy "Response without match" WARN logs ───────────────
+      connectionTimeout: 15_000,
+      requestTimeout:    60_000,
       logLevel:          logLevel.ERROR,
-      // ── Retry with gentle back-off so we don't hammer the broker ────────
       retry: {
         initialRetryTime: 3_000,
         retries:          20,
@@ -43,57 +53,90 @@ class KafkaAlertConsumer extends EventEmitter {
       },
     });
 
-    this.consumer = kafka.consumer({
-      groupId:           "gas-backend-alerts",
-      // ── Session / heartbeat tuned for slow-starting Docker environment ──
-      sessionTimeout:    45_000,   // broker kicks member after this ms of silence
-      heartbeatInterval: 5_000,    // send heartbeat every 5 s (must be < sessionTimeout/3)
-      // ── Fetch tuning: cap wait so connections don't idle into timeout ───
-      maxWaitTimeInMs:   5_000,    // max ms to wait for data before returning empty
+    const baseOpts = {
+      sessionTimeout:    45_000,
+      heartbeatInterval: 5_000,
+      maxWaitTimeInMs:   5_000,
       retry:             { retries: 10 },
-    });
+    };
 
+    // ── Alerts ────────────────────────────────────────────────────────────
+    this.alertConsumer = kafka.consumer({ groupId: "gas-backend-alerts", ...baseOpts });
     try {
-      await this.consumer.connect();
-      await this.consumer.subscribe({
-        topic:         env.kafkaAlertTopic,
-        fromBeginning: false,
-      });
-
-      await this.consumer.run({
+      await this.alertConsumer.connect();
+      await this.alertConsumer.subscribe({ topic: env.kafkaAlertTopic, fromBeginning: false });
+      await this.alertConsumer.run({
         eachMessage: async ({ message }: EachMessagePayload) => {
           try {
             const raw = message.value?.toString();
             if (!raw) return;
-            const payload = JSON.parse(raw);
+            const p = JSON.parse(raw);
+            const p5 = Number(p.predicted_risk_5min ?? p.risk_score ?? 0);
             const alert: AlertEvent = {
-              deviceId:  payload.device_id  ?? "unknown",
-              gasPpm:    Number(payload.gas_ppm   ?? 0),
-              riskScore: Number(payload.risk_score ?? 0),
-              riskLabel: payload.risk_label  ?? "ALERT",
-              eventTs:   Number(payload.event_ts  ?? Date.now()),
+              deviceId:          p.device_id ?? "unknown",
+              gasPpm:            Number(p.gas_ppm ?? 0),
+              predictedRisk5Min: p5,
+              riskLabel:         p.risk_label ?? "ALERT",
+              eventTs:           Number(p.event_ts ?? Date.now()),
+              riskScore:         p5,
             };
             this.emit("alert", alert);
+            await postgresService.insertAlert({
+              deviceId:          alert.deviceId,
+              gasPpm:            alert.gasPpm,
+              predictedRisk5Min: alert.predictedRisk5Min,
+              riskLabel:         alert.riskLabel,
+              eventTs:           alert.eventTs,
+            });
           } catch {
-            // malformed message — ignore
+            /* ignore malformed */
           }
         },
       });
-
-      this.running = true;
-      console.log(`[KafkaConsumer] Subscribed to ${env.kafkaAlertTopic}`);
+      console.log(`[KafkaConsumer] subscribed: ${env.kafkaAlertTopic}`);
     } catch (err) {
-      console.warn(
-        "[KafkaConsumer] Could not connect — alerts disabled:",
-        (err as Error).message,
-      );
+      console.warn("[KafkaConsumer] alert consumer disabled:", (err as Error).message);
     }
+
+    // ── Actions ───────────────────────────────────────────────────────────
+    this.actionConsumer = kafka.consumer({ groupId: "gas-backend-actions", ...baseOpts });
+    try {
+      await this.actionConsumer.connect();
+      await this.actionConsumer.subscribe({ topic: env.kafkaActionTopic, fromBeginning: false });
+      await this.actionConsumer.run({
+        eachMessage: async ({ message }: EachMessagePayload) => {
+          try {
+            const raw = message.value?.toString();
+            if (!raw) return;
+            const p = JSON.parse(raw);
+            const event: ActionEvent = {
+              deviceId:  p.device_id ?? "unknown",
+              action:    p.action ?? "NO_OP",
+              actionId:  Number(p.action_id ?? 0),
+              triggerP5: Number(p.trigger_p5 ?? 0),
+              gasPpm:    Number(p.gas_ppm ?? 0),
+              eventTs:   Number(p.event_ts ?? Date.now()),
+            };
+            this.emit("action", event);
+            await postgresService.insertAction(event);
+          } catch {
+            /* ignore */
+          }
+        },
+      });
+      console.log(`[KafkaConsumer] subscribed: ${env.kafkaActionTopic}`);
+    } catch (err) {
+      console.warn("[KafkaConsumer] action consumer disabled:", (err as Error).message);
+    }
+
+    this.running = true;
   }
 
   async stop(): Promise<void> {
-    await this.consumer?.disconnect();
+    await this.alertConsumer?.disconnect();
+    await this.actionConsumer?.disconnect();
     this.running = false;
   }
 }
 
-export const alertConsumer = new KafkaAlertConsumer();
+export const alertConsumer = new KafkaPipelineConsumer();
