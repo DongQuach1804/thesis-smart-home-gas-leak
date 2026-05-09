@@ -150,14 +150,25 @@ def _get_action_producer():
 
 def get_spark():
     SparkSession, *_ = _import_pyspark()
-    return (
+    spark_driver_host = os.getenv("SPARK_DRIVER_HOST")
+    spark_driver_bind_address = _env("SPARK_DRIVER_BIND_ADDRESS", "0.0.0.0")
+
+    builder = (
         SparkSession.builder
         .master("local[*]")
         .appName("GasLeakStreamProcessor")
         .config("spark.sql.shuffle.partitions", "2")
         .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        .config("spark.driver.host", "localhost")
-        .config("spark.driver.bindAddress", "0.0.0.0")
+        .config("spark.driver.bindAddress", spark_driver_bind_address)
+    )
+
+    # In containerized local mode, hard-coding localhost can break RPC lookups.
+    # Only set spark.driver.host when explicitly provided.
+    if spark_driver_host:
+        builder = builder.config("spark.driver.host", spark_driver_host)
+
+    return (
+        builder
         .getOrCreate()
     )
 
@@ -324,6 +335,9 @@ def main() -> None:
         .option("subscribe", kafka_topic)
         .option("startingOffsets", "latest")
         .option("failOnDataLoss", "false")
+        .option("kafka.request.timeout.ms", "120000")
+        .option("kafka.session.timeout.ms", "120000")
+        .option("kafka.metadata.max.age.ms", "30000")
         .load()
     )
 

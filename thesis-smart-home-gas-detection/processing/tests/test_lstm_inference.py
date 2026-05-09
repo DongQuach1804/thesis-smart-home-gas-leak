@@ -8,6 +8,7 @@ Run with:
 import sys
 import os
 from pathlib import Path
+import importlib
 
 # Add processing/ to path so imports resolve
 PROCESSING_ROOT = Path(__file__).parents[1]
@@ -18,8 +19,18 @@ import pytest
 
 MODEL_PATH = PROCESSING_ROOT / "ml" / "lstm" / "best_lstm_uci.keras"
 
+# Check TensorFlow availability once at collection time
+_TF_AVAILABLE = importlib.util.find_spec("tensorflow") is not None
 
-@pytest.mark.skipif(not MODEL_PATH.exists(), reason="Model file not present")
+
+@pytest.mark.skipif(
+    not MODEL_PATH.exists(),
+    reason="Model file not present — place best_lstm_uci.keras in processing/ml/lstm/"
+)
+@pytest.mark.skipif(
+    not _TF_AVAILABLE,
+    reason="tensorflow not installed — run inside Docker: docker exec processing-engine python -m pytest /app/tests/test_lstm_inference.py"
+)
 class TestLSTMInference:
     """Full inference tests — require the .keras model file."""
 

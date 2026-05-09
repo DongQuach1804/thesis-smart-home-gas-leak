@@ -14,7 +14,7 @@ function Test-Endpoint([string]$label, [string]$url) {
 }
 
 function Test-KafkaTopic([string]$topic) {
-    $result = docker exec kafka kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic $topic 2>&1
+    $result = docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic $topic 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  [OK]  Kafka topic exists: $topic" -ForegroundColor Green
     } else {

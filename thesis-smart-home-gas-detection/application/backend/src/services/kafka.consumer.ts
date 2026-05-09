@@ -43,13 +43,13 @@ class KafkaPipelineConsumer extends EventEmitter {
       clientId:          "gas-backend",
       brokers:           [env.kafkaBroker],
       connectionTimeout: 15_000,
-      requestTimeout:    60_000,
+      requestTimeout:    90_000,
       logLevel:          logLevel.ERROR,
       retry: {
-        initialRetryTime: 3_000,
-        retries:          20,
-        maxRetryTime:     60_000,
-        factor:           1.5,
+        initialRetryTime: 5_000,
+        retries:          5,        // give up after 5 attempts (~2 min total)
+        maxRetryTime:     30_000,
+        factor:           2.0,
       },
     });
 
@@ -63,6 +63,7 @@ class KafkaPipelineConsumer extends EventEmitter {
     // ── Alerts ────────────────────────────────────────────────────────────
     this.alertConsumer = kafka.consumer({ groupId: "gas-backend-alerts", ...baseOpts });
     try {
+      await new Promise(resolve => setTimeout(resolve, 5_000));
       await this.alertConsumer.connect();
       await this.alertConsumer.subscribe({ topic: env.kafkaAlertTopic, fromBeginning: false });
       await this.alertConsumer.run({
@@ -95,7 +96,10 @@ class KafkaPipelineConsumer extends EventEmitter {
       });
       console.log(`[KafkaConsumer] subscribed: ${env.kafkaAlertTopic}`);
     } catch (err) {
-      console.warn("[KafkaConsumer] alert consumer disabled:", (err as Error).message);
+      console.warn(
+        "[KafkaConsumer] alert consumer disabled — real-time alerts off, REST APIs unaffected:",
+        (err as Error).message,
+      );
     }
 
     // ── Actions ───────────────────────────────────────────────────────────

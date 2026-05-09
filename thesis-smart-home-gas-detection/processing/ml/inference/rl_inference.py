@@ -11,17 +11,17 @@ Action codes (must match ``gas_env.ACTION_NAMES``)::
 from __future__ import annotations
 
 import logging
-import math
 import os
 from collections import deque
 from pathlib import Path
-from typing import Deque, Dict, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Tuple
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 ACTION_NAMES = ("NO_OP", "ALERT_USER", "FAN_ON", "CLOSE_VALVE")
+ACTION_LABELS = {i: name for i, name in enumerate(ACTION_NAMES)}
 
 
 class _RuleFallback:
@@ -135,6 +135,32 @@ class GasResponseAgent:
         self._gas_hist.pop(device_id, None)
 
 
-# Backwards compatibility with old name
+# Backwards-compat shim with the older `RLInference` API:
+#   - constructor errors (instead of fallback) when the model is missing
+#   - exposes `choose_action(state_list)` taking a flat feature vector
 class RLInference(GasResponseAgent):
-    pass
+    """Compatibility wrapper exposing the older ``choose_action(state)`` API."""
+
+    def __init__(self, model_path: Optional[str] = None) -> None:
+        path = Path(model_path or os.getenv(
+            "RL_MODEL_PATH",
+            "/app/ml/rl/ppo_gas_agent.zip",
+        ))
+        if not path.exists():
+            raise FileNotFoundError(f"Missing RL model: {path}")
+        super().__init__(str(path))
+        if self._policy is None:
+            raise RuntimeError(f"Failed to load PPO model at {path}")
+        self.model = self._policy
+        self.obs_size = int(self.model.observation_space.shape[0])
+        self.n_actions = int(self.model.action_space.n)
+
+    def choose_action(self, state: List[float]) -> int:
+        obs = np.zeros(self.obs_size, dtype=np.float32)
+        n = min(len(state), self.obs_size)
+        obs[:n] = np.array(state[:n], dtype=np.float32)
+        action, _ = self.model.predict(obs, deterministic=True)
+        return int(action)
+
+    def action_label(self, action: int) -> str:
+        return ACTION_LABELS.get(action, f"ACTION_{action}")

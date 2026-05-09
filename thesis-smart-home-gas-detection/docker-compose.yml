@@ -163,6 +163,8 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/processing/Dockerfile
+      args:
+        PIP_INDEX_URL: https://pypi.org/simple
     container_name: processing-engine
     env_file:
       - .env
