@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { influxService } from "../services/influx.service";
 import { alertConsumer, AlertEvent } from "../services/kafka.consumer";
+import { postgresService } from "../services/postgres.service";
 
 // ─── GET /api/dashboard/latest ────────────────────────────────────────────────
 
@@ -10,14 +11,17 @@ export async function getLatestReadings(req: Request, res: Response): Promise<vo
     const reading = await influxService.getLatestReading(deviceId);
     if (!reading) {
       res.status(200).json({
-        deviceId:        deviceId || "esp32-lab-01",
-        gasPpm:          0,
-        temperatureC:    0,
-        humidityPercent: 0,
-        lstmRiskScore:   0,
-        riskLabel:       "NORMAL",
-        ts:              new Date().toISOString(),
-        _source:         "no_data",
+        deviceId:          deviceId || "esp32-lab-01",
+        gasPpm:            0,
+        temperatureC:      0,
+        humidityPercent:   0,
+        lstmRiskScore:     0,
+        predictedRisk5Min: 0,
+        riskLabel:         "NORMAL",
+        rlAction:          "NO_OP",
+        rlActionId:        0,
+        ts:                new Date().toISOString(),
+        _source:           "no_data",
       });
       return;
     }
@@ -74,16 +78,43 @@ export function streamAlerts(req: Request, res: Response): void {
 export async function getSystemOverview(_req: Request, res: Response): Promise<void> {
   res.status(200).json({
     services: {
-      mqtt:    "up",
-      kafka:   "up",
-      spark:   "up",
+      mqtt:     "up",
+      kafka:    "up",
+      spark:    "up",
       influxdb: "up",
-      postgres: "up",
+      postgres: postgresService.isHealthy() ? "up" : "down",
     },
     model: {
-      lstm: "loaded",
-      rl:   "loaded",
+      lstm:       "loaded",
+      forecaster: "loaded",
+      rl:         "loaded",
     },
     ts: new Date().toISOString(),
   });
+}
+
+// ─── GET /api/dashboard/alerts ────────────────────────────────────────────────
+
+export async function getRecentAlerts(req: Request, res: Response): Promise<void> {
+  const limit = Math.min(Number(req.query.limit ?? 50), 500);
+  try {
+    const rows = await postgresService.recentAlerts(limit);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("[dashboard/alerts]", err);
+    res.status(500).json({ error: "Failed to query Postgres", detail: String(err) });
+  }
+}
+
+// ─── GET /api/dashboard/actions ───────────────────────────────────────────────
+
+export async function getRecentActions(req: Request, res: Response): Promise<void> {
+  const limit = Math.min(Number(req.query.limit ?? 50), 500);
+  try {
+    const rows = await postgresService.recentActions(limit);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("[dashboard/actions]", err);
+    res.status(500).json({ error: "Failed to query Postgres", detail: String(err) });
+  }
 }

@@ -31,14 +31,12 @@
       <!-- Left column: KPI cards + alert feed -->
       <aside class="sidebar">
 
-        <!-- Risk gauge card -->
+        <!-- Predicted-risk-in-5-minutes gauge (forecasting LSTM) -->
         <div class="card card--risk" id="card-risk">
-          <div class="card__label">LSTM Risk Score</div>
+          <div class="card__label">Predicted Risk in 5 min</div>
           <div class="risk-gauge">
             <svg viewBox="0 0 120 80" class="gauge-svg" id="gauge-svg">
-              <!-- background arc -->
               <path d="M10 70 A55 55 0 0 1 110 70" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round"/>
-              <!-- value arc -->
               <path class="gauge-arc" id="gauge-arc"
                     d="M10 70 A55 55 0 0 1 110 70"
                     fill="none" stroke="#22c55e" stroke-width="10"
@@ -47,6 +45,16 @@
             <div class="gauge-value" id="gauge-value">0.00</div>
           </div>
           <div class="badge badge--label" id="risk-label">NORMAL</div>
+          <div class="card__sub" id="legacy-score" style="opacity:.6;font-size:.75rem;margin-top:.25rem;">
+            current anomaly: 0.00
+          </div>
+        </div>
+
+        <!-- RL action card -->
+        <div class="card" id="card-action">
+          <div class="card__label">🤖 Auto Action (RL)</div>
+          <div class="kpi__value" id="rl-action-val" style="font-size:1.4rem;">NO_OP</div>
+          <div class="kpi__label" id="rl-action-sub" style="opacity:.65;">policy idle</div>
         </div>
 
         <!-- Sensor KPI cards -->
@@ -108,11 +116,11 @@
           </div>
         </div>
 
-        <!-- LSTM risk score chart -->
+        <!-- Predicted-risk-5min chart (forecasting LSTM) -->
         <div class="card card--chart">
           <div class="card__header">
-            <span class="card__label">LSTM Risk Score</span>
-            <span class="badge badge--ai">AI</span>
+            <span class="card__label">Predicted Risk (5-min Forecast)</span>
+            <span class="badge badge--ai">FORECAST</span>
           </div>
           <div class="chart-wrap">
             <canvas id="chart-risk"></canvas>
@@ -205,12 +213,38 @@
       }
 
       // ─── KPI updater ───────────────────────────────────────────────────────
+      const ACTION_MEANING = {
+        NO_OP:       "policy idle",
+        ALERT_USER:  "🔔 user notified",
+        FAN_ON:      "💨 ventilation engaged",
+        CLOSE_VALVE: "🛑 gas valve closed",
+      };
+
       function updateKpis(d) {
         document.getElementById("kpi-gas-val").textContent    = d.gasPpm?.toFixed(1)       ?? "—";
         document.getElementById("kpi-temp-val").textContent   = d.temperatureC?.toFixed(1)  ?? "—";
         document.getElementById("kpi-hum-val").textContent    = d.humidityPercent?.toFixed(1) ?? "—";
         document.getElementById("kpi-device-val").textContent = d.deviceId ?? "—";
         document.getElementById("badge-pipeline").className   = "badge badge--system badge--normal";
+
+        // Legacy anomaly score line
+        const legacy = document.getElementById("legacy-score");
+        if (legacy) legacy.textContent = "current anomaly: " + (d.lstmRiskScore ?? 0).toFixed(2);
+
+        // RL action card
+        const action = d.rlAction || "NO_OP";
+        const actionVal = document.getElementById("rl-action-val");
+        const actionSub = document.getElementById("rl-action-sub");
+        if (actionVal) actionVal.textContent = action;
+        if (actionSub) actionSub.textContent = ACTION_MEANING[action] || "—";
+        const actionCard = document.getElementById("card-action");
+        if (actionCard) {
+          actionCard.dataset.action = action;
+          actionCard.style.borderLeft = action === "CLOSE_VALVE" ? "3px solid #ef4444"
+            : action === "FAN_ON"     ? "3px solid #f59e0b"
+            : action === "ALERT_USER" ? "3px solid #38bdf8"
+                                       : "3px solid transparent";
+        }
 
         // Gas card colour
         const gasCard = document.getElementById("kpi-gas");
@@ -271,8 +305,8 @@
         .then(rows => {
           rows.forEach(r => {
             const t = new Date(r.ts).toLocaleTimeString("vi-VN", { hour12: false });
-            pushPoint(gasChart,  t, r.gasPpm,        MAX_CHART_PTS);
-            pushPoint(riskChart, t, r.lstmRiskScore,  MAX_CHART_PTS);
+            pushPoint(gasChart,  t, r.gasPpm,                              MAX_CHART_PTS);
+            pushPoint(riskChart, t, r.predictedRisk5Min ?? r.lstmRiskScore, MAX_CHART_PTS);
           });
         })
         .catch(() => console.warn("[history] InfluxDB not reachable yet"));
@@ -284,10 +318,11 @@
           const d = await r.json();
           if (r.ok && d && d.gasPpm !== undefined) {
             const t = new Date(d.ts).toLocaleTimeString("vi-VN", { hour12: false });
+            const p5 = d.predictedRisk5Min ?? d.lstmRiskScore ?? 0;
             updateKpis(d);
-            setGauge(d.lstmRiskScore ?? 0, d.riskLabel ?? "NORMAL");
-            pushPoint(gasChart,  t, d.gasPpm,        MAX_CHART_PTS);
-            pushPoint(riskChart, t, d.lstmRiskScore,  MAX_CHART_PTS);
+            setGauge(p5, d.riskLabel ?? "NORMAL");
+            pushPoint(gasChart,  t, d.gasPpm, MAX_CHART_PTS);
+            pushPoint(riskChart, t, p5,       MAX_CHART_PTS);
           }
         } catch {
           document.getElementById("badge-pipeline").className = "badge badge--system badge--alert";

@@ -10,13 +10,16 @@ import { env } from "../config/env";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface GasReading {
-  deviceId:         string;
-  gasPpm:           number;
-  temperatureC:     number;
-  humidityPercent:  number;
-  lstmRiskScore:    number;
-  riskLabel:        string;
-  ts:               string;   // ISO-8601
+  deviceId:           string;
+  gasPpm:             number;
+  temperatureC:       number;
+  humidityPercent:    number;
+  lstmRiskScore:      number;       // legacy anomaly score
+  predictedRisk5Min:  number;       // P(critical in next 5 min) — forecasting
+  riskLabel:          string;
+  rlAction:           string;       // NO_OP | ALERT_USER | FAN_ON | CLOSE_VALVE
+  rlActionId:         number;
+  ts:                 string;       // ISO-8601
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -42,7 +45,7 @@ class InfluxService {
         |> range(start: -15m)
         |> filter(fn: (r) => r._measurement == "gas_reading")
         ${deviceFilter}
-        |> pivot(rowKey: ["_time","device_id","risk_label"], columnKey: ["_field"], valueColumn: "_value")
+        |> pivot(rowKey: ["_time","device_id","risk_label","rl_action"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: 1)
     `;
@@ -53,13 +56,16 @@ class InfluxService {
         next: (row, meta) => {
           const o = meta.toObject(row);
           rows.push({
-            deviceId:        String(o["device_id"]   ?? ""),
-            gasPpm:          Number(o["gas_ppm"]      ?? 0),
-            temperatureC:    Number(o["temperature_c"] ?? 0),
-            humidityPercent: Number(o["humidity_percent"] ?? 0),
-            lstmRiskScore:   Number(o["lstm_risk_score"]  ?? 0),
-            riskLabel:       String(o["risk_label"]   ?? "NORMAL"),
-            ts:              String(o["_time"]         ?? new Date().toISOString()),
+            deviceId:          String(o["device_id"]            ?? ""),
+            gasPpm:            Number(o["gas_ppm"]              ?? 0),
+            temperatureC:      Number(o["temperature_c"]        ?? 0),
+            humidityPercent:   Number(o["humidity_percent"]     ?? 0),
+            lstmRiskScore:     Number(o["lstm_risk_score"]      ?? 0),
+            predictedRisk5Min: Number(o["predicted_risk_5min"]  ?? 0),
+            riskLabel:         String(o["risk_label"]           ?? "NORMAL"),
+            rlAction:          String(o["rl_action"]            ?? "NO_OP"),
+            rlActionId:        Number(o["rl_action_id"]         ?? 0),
+            ts:                String(o["_time"]                ?? new Date().toISOString()),
           });
         },
         error: reject,
@@ -87,7 +93,7 @@ class InfluxService {
         |> filter(fn: (r) => r._measurement == "gas_reading")
         ${deviceFilter}
         |> aggregateWindow(every: ${sampleEvery}s, fn: last, createEmpty: false)
-        |> pivot(rowKey: ["_time","device_id","risk_label"], columnKey: ["_field"], valueColumn: "_value")
+        |> pivot(rowKey: ["_time","device_id","risk_label","rl_action"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: false)
     `;
 
@@ -97,13 +103,16 @@ class InfluxService {
         next: (row, meta) => {
           const o = meta.toObject(row);
           rows.push({
-            deviceId:        String(o["device_id"]    ?? ""),
-            gasPpm:          Number(o["gas_ppm"]       ?? 0),
-            temperatureC:    Number(o["temperature_c"]  ?? 0),
-            humidityPercent: Number(o["humidity_percent"] ?? 0),
-            lstmRiskScore:   Number(o["lstm_risk_score"]  ?? 0),
-            riskLabel:       String(o["risk_label"]    ?? "NORMAL"),
-            ts:              String(o["_time"]          ?? ""),
+            deviceId:          String(o["device_id"]            ?? ""),
+            gasPpm:            Number(o["gas_ppm"]              ?? 0),
+            temperatureC:      Number(o["temperature_c"]        ?? 0),
+            humidityPercent:   Number(o["humidity_percent"]     ?? 0),
+            lstmRiskScore:     Number(o["lstm_risk_score"]      ?? 0),
+            predictedRisk5Min: Number(o["predicted_risk_5min"]  ?? 0),
+            riskLabel:         String(o["risk_label"]           ?? "NORMAL"),
+            rlAction:          String(o["rl_action"]            ?? "NO_OP"),
+            rlActionId:        Number(o["rl_action_id"]         ?? 0),
+            ts:                String(o["_time"]                ?? ""),
           });
         },
         error: reject,

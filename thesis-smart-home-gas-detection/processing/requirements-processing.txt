@@ -16,7 +16,10 @@ kafka-python==2.0.2
 python-dotenv==1.0.1
 pandas==2.2.2
 scikit-learn==1.5.1
-stable-baselines3==2.7.0
+
+# ── Reinforcement learning (PPO controller + Gym env) ─────────────────────────
+gymnasium==0.29.1
+stable-baselines3==2.3.2
 
 # ── Testing ────────────────────────────────────────────────────────────────────
 pytest==8.3.2

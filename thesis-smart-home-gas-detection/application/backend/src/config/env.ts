@@ -24,6 +24,7 @@ export const env = {
 
   kafkaBroker:      optional("KAFKA_BROKER",           "localhost:9092"),
   kafkaAlertTopic:  optional("KAFKA_TOPIC_ALERT",      "gas.alert.events"),
+  kafkaActionTopic: optional("KAFKA_TOPIC_ACTION",     "gas.action.events"),
   kafkaRawTopic:    optional("KAFKA_TOPIC_RAW_GAS",    "gas.raw.sensor"),
 
   postgresHost:     optional("POSTGRES_HOST",     "localhost"),
