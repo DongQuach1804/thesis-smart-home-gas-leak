@@ -98,8 +98,9 @@ Produces the comparison table for the thesis report.
 ```bash
 cp .env.example .env
 docker compose up --build
-# Dashboard: http://localhost:8080
-# Grafana:   http://localhost:3001  (admin / admin123456)
+# Dashboard: http://127.0.0.1:8080
+# Grafana:   http://127.0.0.1:3001  (admin / admin123456)
+# API docs:  http://127.0.0.1:3000/api/docs
 ```
 
 ## What changed vs. the original code

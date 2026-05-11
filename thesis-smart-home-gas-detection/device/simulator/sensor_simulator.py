@@ -51,14 +51,17 @@ logger = logging.getLogger(__name__)
 MQTT_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC_SENSOR", "sensors/gas")
-DEVICE_ID = os.getenv("DEVICE_ID", "esp32-lab-01")
+DEVICE_ID = os.getenv("DEVICE_ID", "esp32-lab-01").strip() or "esp32-lab-01"
 MQTT_KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "30"))
+MQTT_QOS = min(max(int(os.getenv("MQTT_QOS", "0")), 0), 2)
+MQTT_RETAIN = os.getenv("MQTT_RETAIN", "false").strip().lower() in {"1", "true", "yes", "on"}
+MQTT_PUBLISH_TIMEOUT_SEC = float(os.getenv("MQTT_PUBLISH_TIMEOUT_SEC", "5"))
 
 logger.info(f"Connecting to MQTT {MQTT_HOST}:{MQTT_PORT}, topic={MQTT_TOPIC}")
 
-PUBLISH_HZ = float(os.getenv("SIM_PUBLISH_HZ", "1.0"))
-LEAK_PROB_PER_MIN = float(os.getenv("SIM_LEAK_PROB_PER_MIN", "0.05"))
-CRITICAL_PPM = float(os.getenv("SIM_CRITICAL_PPM", "1000.0"))
+PUBLISH_HZ = max(0.1, float(os.getenv("SIM_PUBLISH_HZ", "1.0")))
+LEAK_PROB_PER_MIN = min(max(float(os.getenv("SIM_LEAK_PROB_PER_MIN", "0.05")), 0.0), 1.0)
+CRITICAL_PPM = max(1.0, float(os.getenv("SIM_CRITICAL_PPM", "1000.0")))
 
 _seed = os.getenv("SIM_SEED")
 if _seed:
@@ -161,14 +164,72 @@ def _seconds_to_critical(w: World) -> int:
     return -1
 
 
+def _finite(value: float, fallback: float) -> float:
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        return float(value)
+    return fallback
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(value, high))
+
+
+def _normalise_world(w: World) -> None:
+    """Keep emitted sensor values inside the schema expected by processing."""
+    w.gas = _clamp(_finite(w.gas, 60.0), 0.0, 2000.0)
+    w.temp = _clamp(_finite(w.temp, 28.0), 0.0, 60.0)
+    w.hum = _clamp(_finite(w.hum, 60.0), 0.0, 100.0)
+    w.state_age_s = max(0.0, _finite(w.state_age_s, 0.0))
+
+
+def validate_payload(payload: dict) -> tuple[bool, str]:
+    required = {
+        "device_id": str,
+        "gas_ppm": (int, float),
+        "temperature_c": (int, float),
+        "humidity_percent": (int, float),
+        "event_ts": int,
+    }
+
+    for field, expected_type in required.items():
+        if field not in payload:
+            return False, f"missing field {field}"
+        if not isinstance(payload[field], expected_type):
+            return False, f"invalid type for {field}: {type(payload[field]).__name__}"
+
+    if not payload["device_id"].strip():
+        return False, "device_id is empty"
+
+    numeric_ranges = {
+        "gas_ppm": (0.0, 2000.0),
+        "temperature_c": (0.0, 60.0),
+        "humidity_percent": (0.0, 100.0),
+    }
+    for field, (low, high) in numeric_ranges.items():
+        value = float(payload[field])
+        if not math.isfinite(value):
+            return False, f"{field} is not finite"
+        if value < low or value > high:
+            return False, f"{field}={value} outside range [{low}, {high}]"
+
+    if payload["event_ts"] <= 0:
+        return False, "event_ts must be a positive millisecond timestamp"
+
+    return True, "ok"
+
+
 def build_payload(w: World) -> dict:
+    _normalise_world(w)
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     return {
+        "schema_version": 1,
+        "source": "simulator",
         "device_id": DEVICE_ID,
         "gas_ppm": round(w.gas, 2),
         "temperature_c": round(w.temp, 2),
         "humidity_percent": round(w.hum, 2),
         "event_ts": now_ms,
+        "event_time": datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).isoformat(),
         # Side-channel ground truth (only used by benchmark, NOT by the model)
         "_leak_state": w.state.value,
         "_seconds_to_critical": _seconds_to_critical(w),
@@ -210,7 +271,7 @@ def main() -> None:
     world = World()
     dt = 1.0 / PUBLISH_HZ
     logger.info(
-        f"Publishing to {MQTT_TOPIC} @ {PUBLISH_HZ} Hz, "
+        f"Publishing to {MQTT_TOPIC} @ {PUBLISH_HZ} Hz, qos={MQTT_QOS}, "
         f"leak prob = {LEAK_PROB_PER_MIN}/min, critical = {CRITICAL_PPM} ppm"
     )
 
@@ -230,10 +291,35 @@ def main() -> None:
             world.state_age_s += dt
 
             payload = build_payload(world)
-            result = client.publish(MQTT_TOPIC, json.dumps(payload))
+            ok, reason = validate_payload(payload)
+            if not ok:
+                logger.error("Invalid simulator payload skipped: %s payload=%s", reason, payload)
+                time.sleep(dt)
+                continue
+
+            try:
+                encoded_payload = json.dumps(payload, allow_nan=False, separators=(",", ":"))
+            except ValueError as exc:
+                logger.error("Invalid JSON payload skipped: %s payload=%s", exc, payload)
+                time.sleep(dt)
+                continue
+
+            result = client.publish(
+                MQTT_TOPIC,
+                encoded_payload,
+                qos=MQTT_QOS,
+                retain=MQTT_RETAIN,
+            )
+            if MQTT_QOS > 0:
+                result.wait_for_publish(timeout=MQTT_PUBLISH_TIMEOUT_SEC)
+                if not result.is_published():
+                    logger.warning("Publish ack timed out for message %s", result.mid)
+                    time.sleep(dt)
+                    continue
             if result.rc == 0:
                 logger.info(
                     f"#{counter} state={world.state.value:<11} "
+                    f"id={payload['device_id']} "
                     f"gas={payload['gas_ppm']:7.1f} ppm "
                     f"ttc={payload['_seconds_to_critical']:>4}s"
                 )

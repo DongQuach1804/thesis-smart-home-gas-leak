@@ -21,7 +21,7 @@ export async function getLatestReadings(req: Request, res: Response): Promise<vo
         rlAction:          "NO_OP",
         rlActionId:        0,
         ts:                new Date().toISOString(),
-        _source:           "no_data",
+        _source:           "no_fresh_data",
       });
       return;
     }

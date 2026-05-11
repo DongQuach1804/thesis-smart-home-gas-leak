@@ -11,6 +11,9 @@ import { Kafka, Consumer, EachMessagePayload, logLevel } from "kafkajs";
 import EventEmitter from "events";
 import { env } from "../config/env";
 import { postgresService } from "./postgres.service";
+import { telegramService } from "./telegram.service";
+
+const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 
 export interface AlertEvent {
   deviceId:           string;
@@ -18,6 +21,12 @@ export interface AlertEvent {
   predictedRisk5Min:  number;     // P(critical in 5 min) from forecaster
   riskLabel:          string;
   eventTs:            number;
+  alertSource:        string;
+  alertTime:          string;
+  rlAction:           string;
+  rlActionId:         number;
+  lstmRiskScore:      number;
+  lstmRiskLabel:      string;
   // Legacy alias preserved so existing SSE clients still parse "riskScore"
   riskScore:          number;
 }
@@ -36,6 +45,18 @@ class KafkaPipelineConsumer extends EventEmitter {
   private actionConsumer: Consumer | null = null;
   private running = false;
 
+  private normalizeEventTs(raw: unknown): number {
+    const parsed = Number(raw ?? Date.now());
+    if (!Number.isFinite(parsed) || parsed <= 0) return Date.now();
+    return parsed < 1_000_000_000_000 ? parsed * 1000 : parsed;
+  }
+
+  private isStaleEvent(eventTs: number): boolean {
+    const maxAgeMs = Math.max(0, env.alertMaxAgeSec) * 1000;
+    if (maxAgeMs === 0) return false;
+    return Date.now() - eventTs > maxAgeMs;
+  }
+
   async start(): Promise<void> {
     if (this.running) return;
 
@@ -43,25 +64,26 @@ class KafkaPipelineConsumer extends EventEmitter {
       clientId:          "gas-backend",
       brokers:           [env.kafkaBroker],
       connectionTimeout: 15_000,
-      requestTimeout:    90_000,
+      requestTimeout:    300_000,
       logLevel:          logLevel.ERROR,
       retry: {
         initialRetryTime: 5_000,
         retries:          5,        // give up after 5 attempts (~2 min total)
-        maxRetryTime:     30_000,
+        maxRetryTime:     60_000,
         factor:           2.0,
       },
     });
 
     const baseOpts = {
-      sessionTimeout:    45_000,
+      sessionTimeout:    60_000,
+      rebalanceTimeout:  300_000,
       heartbeatInterval: 5_000,
       maxWaitTimeInMs:   5_000,
       retry:             { retries: 10 },
     };
 
     // ── Alerts ────────────────────────────────────────────────────────────
-    this.alertConsumer = kafka.consumer({ groupId: "gas-backend-alerts", ...baseOpts });
+    this.alertConsumer = kafka.consumer({ groupId: env.kafkaAlertGroupId, ...baseOpts });
     try {
       await new Promise(resolve => setTimeout(resolve, 5_000));
       await this.alertConsumer.connect();
@@ -73,15 +95,34 @@ class KafkaPipelineConsumer extends EventEmitter {
             if (!raw) return;
             const p = JSON.parse(raw);
             const p5 = Number(p.predicted_risk_5min ?? p.risk_score ?? 0);
+            const eventTs = this.normalizeEventTs(p.event_ts);
+            if (this.isStaleEvent(eventTs)) {
+              console.warn(
+                "[KafkaConsumer] skipped stale alert: device=%s source=%s ageSec=%s",
+                p.device_id ?? "unknown",
+                p.alert_source ?? "unknown",
+                Math.round((Date.now() - eventTs) / 1000),
+              );
+              return;
+            }
             const alert: AlertEvent = {
               deviceId:          p.device_id ?? "unknown",
               gasPpm:            Number(p.gas_ppm ?? 0),
               predictedRisk5Min: p5,
               riskLabel:         p.risk_label ?? "ALERT",
-              eventTs:           Number(p.event_ts ?? Date.now()),
-              riskScore:         p5,
+              eventTs,
+              alertSource:       p.alert_source ?? "LSTM_FORECAST",
+              alertTime:         p.alert_time ?? new Date(eventTs).toISOString(),
+              rlAction:          p.rl_action ?? "NO_OP",
+              rlActionId:        Number(p.rl_action_id ?? 0),
+              lstmRiskScore:     Number(p.lstm_risk_score ?? 0),
+              lstmRiskLabel:     p.lstm_risk_label ?? "NORMAL",
+              riskScore:         Number(p.risk_score ?? p5),
             };
             this.emit("alert", alert);
+            if (TRUE_VALUES.has(env.telegramNotifyFromKafka.toLowerCase())) {
+              void telegramService.notifyAlert(alert);
+            }
             await postgresService.insertAlert({
               deviceId:          alert.deviceId,
               gasPpm:            alert.gasPpm,
@@ -103,7 +144,7 @@ class KafkaPipelineConsumer extends EventEmitter {
     }
 
     // ── Actions ───────────────────────────────────────────────────────────
-    this.actionConsumer = kafka.consumer({ groupId: "gas-backend-actions", ...baseOpts });
+    this.actionConsumer = kafka.consumer({ groupId: env.kafkaActionGroupId, ...baseOpts });
     try {
       await this.actionConsumer.connect();
       await this.actionConsumer.subscribe({ topic: env.kafkaActionTopic, fromBeginning: false });
@@ -113,13 +154,14 @@ class KafkaPipelineConsumer extends EventEmitter {
             const raw = message.value?.toString();
             if (!raw) return;
             const p = JSON.parse(raw);
+            const eventTs = this.normalizeEventTs(p.event_ts);
             const event: ActionEvent = {
               deviceId:  p.device_id ?? "unknown",
               action:    p.action ?? "NO_OP",
               actionId:  Number(p.action_id ?? 0),
               triggerP5: Number(p.trigger_p5 ?? 0),
               gasPpm:    Number(p.gas_ppm ?? 0),
-              eventTs:   Number(p.event_ts ?? Date.now()),
+              eventTs,
             };
             this.emit("action", event);
             await postgresService.insertAction(event);

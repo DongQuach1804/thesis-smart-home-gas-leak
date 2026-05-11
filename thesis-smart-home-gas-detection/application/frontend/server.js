@@ -6,9 +6,9 @@ const port = Number(process.env.FRONTEND_PORT || 8080);
 
 // BACKEND_BASE_URL is injected at Docker runtime.
 // It must be reachable FROM THE BROWSER (the host machine), not from inside
-// the Docker network.  docker-compose.yml sets this to http://localhost:3000.
-// Fallback to localhost for local dev without Docker.
-const backendBaseUrl = process.env.BACKEND_BASE_URL || "http://localhost:3000";
+// the Docker network.  docker-compose.yml sets this to http://127.0.0.1:3000.
+// Fallback to 127.0.0.1 for local dev without Docker.
+const backendBaseUrl = process.env.BACKEND_BASE_URL || "http://127.0.0.1:3000";
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));

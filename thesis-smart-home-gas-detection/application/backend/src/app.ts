@@ -1,7 +1,9 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import swaggerUi from "swagger-ui-express";
 import { apiRouter } from "./routes";
+import { openApiSpec } from "./docs/openapi";
 
 export const app = express();
 
@@ -14,6 +16,8 @@ app.use(helmet({ contentSecurityPolicy: false }));
 const corsOrigins: string[] = [
   "http://localhost:8080",
   "http://localhost:3000",
+  "http://127.0.0.1:8080",
+  "http://127.0.0.1:3000",
   "http://frontend:8080",
 ];
 
@@ -40,6 +44,12 @@ app.get("/health", (_req: Request, res: Response) => {
     ts:      new Date().toISOString(),
   });
 });
+
+// ── API docs ───────────────────────────────────────────────────────────────
+app.get("/api/docs.json", (_req: Request, res: Response) => {
+  res.status(200).json(openApiSpec);
+});
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec, { explorer: true }));
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use("/api", apiRouter);

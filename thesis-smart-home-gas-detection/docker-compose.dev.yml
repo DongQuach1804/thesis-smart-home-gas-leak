@@ -1,6 +1,6 @@
 services:
   backend:
-    command: ["npm", "run", "dev"]
+    command: ["sh", "-c", "npm install && npm run dev"]
     volumes:
       - ./application/backend/src:/app/src   # hot-reload source only
     environment:
@@ -16,7 +16,7 @@ services:
       - ./application/frontend/public:/app/public   # hot-reload static assets
     environment:
       # Browser-accessible backend URL
-      - BACKEND_BASE_URL=http://localhost:3000
+      - BACKEND_BASE_URL=http://127.0.0.1:3000
 
   mqtt-kafka-bridge:
     volumes:

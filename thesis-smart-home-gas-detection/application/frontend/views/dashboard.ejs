@@ -175,7 +175,7 @@
       // ─── Config ────────────────────────────────────────────────────────────
       const API = "<%= backendBaseUrl %>/api";
       const POLL_MS      = 3000;   // latest reading poll interval
-      const HISTORY_MINS = 30;
+      const HISTORY_MINS = 5;
       const MAX_CHART_PTS = 60;
 
       // risk label → CSS class & colour
@@ -221,11 +221,14 @@
       };
 
       function updateKpis(d) {
-        document.getElementById("kpi-gas-val").textContent    = d.gasPpm?.toFixed(1)       ?? "—";
-        document.getElementById("kpi-temp-val").textContent   = d.temperatureC?.toFixed(1)  ?? "—";
-        document.getElementById("kpi-hum-val").textContent    = d.humidityPercent?.toFixed(1) ?? "—";
+        const hasFreshData = d._source !== "no_fresh_data";
+        document.getElementById("kpi-gas-val").textContent    = hasFreshData ? (d.gasPpm?.toFixed(1) ?? "—") : "—";
+        document.getElementById("kpi-temp-val").textContent   = hasFreshData ? (d.temperatureC?.toFixed(1) ?? "—") : "—";
+        document.getElementById("kpi-hum-val").textContent    = hasFreshData ? (d.humidityPercent?.toFixed(1) ?? "—") : "—";
         document.getElementById("kpi-device-val").textContent = d.deviceId ?? "—";
-        document.getElementById("badge-pipeline").className   = "badge badge--system badge--normal";
+        document.getElementById("badge-pipeline").className   = hasFreshData
+          ? "badge badge--system badge--normal"
+          : "badge badge--system badge--warning";
 
         // Legacy anomaly score line
         const legacy = document.getElementById("legacy-score");
@@ -248,7 +251,7 @@
 
         // Gas card colour
         const gasCard = document.getElementById("kpi-gas");
-        const gas = d.gasPpm ?? 0;
+        const gas = hasFreshData ? (d.gasPpm ?? 0) : 0;
         gasCard.className = gas > 700 ? "card kpi kpi--danger" : gas > 400 ? "card kpi kpi--warn" : "card kpi";
       }
 
@@ -317,7 +320,12 @@
           const r = await fetch(`${API}/dashboard/latest`);
           const d = await r.json();
           if (r.ok && d && d.gasPpm !== undefined) {
-            const t = new Date(d.ts).toLocaleTimeString("vi-VN", { hour12: false });
+            if (d._source === "no_fresh_data") {
+              updateKpis(d);
+              setGauge(0, "NORMAL");
+              return;
+            }
+            const t = new Date().toLocaleTimeString("vi-VN", { hour12: false });
             const p5 = d.predictedRisk5Min ?? d.lstmRiskScore ?? 0;
             updateKpis(d);
             setGauge(p5, d.riskLabel ?? "NORMAL");
@@ -335,20 +343,36 @@
       (function initSSE() {
         const list = document.getElementById("alert-list");
         const MAX_ALERTS = 20;
+        let sse;
+
+        function toNumber(value, fallback = 0) {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : fallback;
+        }
+
+        function alertTimestamp(a) {
+          const raw = toNumber(a.eventTs || a.event_ts || Date.now(), Date.now());
+          return raw < 1_000_000_000_000 ? raw * 1000 : raw;
+        }
 
         function appendAlert(a) {
           const empty = list.querySelector(".alert-list__empty");
           if (empty) empty.remove();
 
-          const meta  = RISK_META[a.riskLabel] || RISK_META.NORMAL;
+          const label = (a.riskLabel || a.risk_label || "ALERT").toUpperCase();
+          const deviceId = a.deviceId || a.device_id || "unknown";
+          const gasPpm = toNumber(a.gasPpm ?? a.gas_ppm);
+          const riskScore = toNumber(a.riskScore ?? a.predictedRisk5Min ?? a.predicted_risk_5min);
+          const source = a.alertSource || a.alert_source || "alert";
+          const meta  = RISK_META[label] || RISK_META.NORMAL;
           const li    = document.createElement("li");
-          const ts    = new Date(a.eventTs).toLocaleTimeString("vi-VN", { hour12: false });
-          li.className = "alert-item alert-item--" + a.riskLabel.toLowerCase();
+          const ts    = new Date(alertTimestamp(a)).toLocaleString("vi-VN", { hour12: false });
+          li.className = "alert-item alert-item--" + label.toLowerCase();
           li.innerHTML = `
             <span class="alert-item__dot" style="background:${meta.hex}"></span>
             <span class="alert-item__body">
-              <strong>${a.riskLabel}</strong> · ${a.deviceId}<br/>
-              <span class="mono">${a.gasPpm.toFixed(1)} ppm · risk ${a.riskScore.toFixed(4)}</span>
+              <strong>${label}</strong> · ${deviceId}<br/>
+              <span class="mono">${gasPpm.toFixed(1)} ppm · risk ${riskScore.toFixed(4)} · ${source}</span>
             </span>
             <span class="alert-item__time">${ts}</span>`;
           list.prepend(li);
@@ -359,10 +383,21 @@
           setTimeout(() => document.getElementById("card-risk").classList.remove("card--flash"), 600);
         }
 
+        fetch(`${API}/dashboard/alerts?limit=${MAX_ALERTS}`)
+          .then(r => r.json())
+          .then(rows => {
+            if (!Array.isArray(rows)) return;
+            rows.slice().reverse().forEach(appendAlert);
+          })
+          .catch(() => console.warn("[alerts] Postgres not reachable yet"));
+
         try {
-          const sse = new EventSource(`${API}/dashboard/alerts/stream`);
+          sse = new EventSource(`${API}/dashboard/alerts/stream`);
           sse.onmessage = (e) => appendAlert(JSON.parse(e.data));
-          sse.onerror   = () => setTimeout(initSSE, 5000);
+          sse.onerror   = () => {
+            sse.close();
+            setTimeout(initSSE, 5000);
+          };
         } catch {
           console.warn("[SSE] EventSource not available");
         }

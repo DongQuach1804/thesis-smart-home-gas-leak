@@ -116,13 +116,22 @@ class TestWriteBatch:
 
     @patch("stream_processor._import_influx")
     @patch("stream_processor._get_lstm")
+    @patch("stream_processor._get_forecaster")
+    @patch("stream_processor._get_rl_agent")
     @patch("stream_processor._get_alert_producer")
-    def test_alert_published_for_high_risk(self, mock_prod_fn, mock_lstm_fn, mock_influx_fn):
-        """Alert producer.send() called once for ALERT risk label."""
+    def test_alert_published_for_high_risk(self, mock_prod_fn, mock_rl_fn, mock_forecaster_fn, mock_lstm_fn, mock_influx_fn):
+        """Realtime and LSTM forecast alerts are both published when both thresholds fire."""
         lstm = MagicMock()
         lstm.predict.return_value    = 0.92
         lstm.risk_label.return_value = "ALERT"
         mock_lstm_fn.return_value    = lstm
+        forecaster = MagicMock()
+        forecaster.predict.return_value = 0.92
+        forecaster.horizon_s = 300
+        mock_forecaster_fn.return_value = forecaster
+        rl_agent = MagicMock()
+        rl_agent.choose.return_value = (3, "CLOSE_VALVE")
+        mock_rl_fn.return_value = rl_agent
 
         alert_producer = MagicMock()
         mock_prod_fn.return_value = alert_producer
@@ -134,12 +143,16 @@ class TestWriteBatch:
         from stream_processor import write_batch
         write_batch(df, batch_id=2)
 
-        alert_producer.send.assert_called_once()
-        payload = alert_producer.send.call_args[0][1]
-        assert payload["risk_label"] == "ALERT"
-        assert payload["device_id"]  == "dev-01"
-        assert payload["gas_ppm"]    == pytest.approx(1200.0)
-        assert payload["risk_score"] == pytest.approx(0.92)
+        assert alert_producer.send.call_count == 2
+        payloads = [c.args[1] for c in alert_producer.send.call_args_list]
+        assert {p["alert_source"] for p in payloads} == {"REALTIME_GAS", "LSTM_FORECAST"}
+        for payload in payloads:
+            assert payload["risk_label"] == "ALERT"
+            assert payload["device_id"]  == "dev-01"
+            assert payload["gas_ppm"]    == pytest.approx(1200.0)
+            assert payload["rl_action"]  == "CLOSE_VALVE"
+        forecast_payload = next(p for p in payloads if p["alert_source"] == "LSTM_FORECAST")
+        assert forecast_payload["risk_score"] == pytest.approx(0.92)
 
     # ── no alert for NORMAL ───────────────────────────────────────────────────
 
@@ -169,13 +182,22 @@ class TestWriteBatch:
 
     @patch("stream_processor._import_influx")
     @patch("stream_processor._get_lstm")
+    @patch("stream_processor._get_forecaster")
+    @patch("stream_processor._get_rl_agent")
     @patch("stream_processor._get_alert_producer")
-    def test_alert_published_for_warning(self, mock_prod_fn, mock_lstm_fn, mock_influx_fn):
-        """Alert producer.send() called for WARNING risk label too."""
+    def test_alert_published_for_warning(self, mock_prod_fn, mock_rl_fn, mock_forecaster_fn, mock_lstm_fn, mock_influx_fn):
+        """Forecast WARNING alerts are published too."""
         lstm = MagicMock()
         lstm.predict.return_value    = 0.55
         lstm.risk_label.return_value = "WARNING"
         mock_lstm_fn.return_value    = lstm
+        forecaster = MagicMock()
+        forecaster.predict.return_value = 0.55
+        forecaster.horizon_s = 300
+        mock_forecaster_fn.return_value = forecaster
+        rl_agent = MagicMock()
+        rl_agent.choose.return_value = (1, "ALERT_USER")
+        mock_rl_fn.return_value = rl_agent
 
         alert_producer = MagicMock()
         mock_prod_fn.return_value = alert_producer
@@ -188,7 +210,10 @@ class TestWriteBatch:
         write_batch(df, batch_id=4)
 
         alert_producer.send.assert_called_once()
-        assert alert_producer.send.call_args[0][1]["risk_label"] == "WARNING"
+        payload = alert_producer.send.call_args[0][1]
+        assert payload["alert_source"] == "LSTM_FORECAST"
+        assert payload["risk_label"] == "WARNING"
+        assert payload["rl_action"] == "ALERT_USER"
 
     # ── graceful degradation when LSTM unavailable ────────────────────────────
 

@@ -42,10 +42,11 @@ class InfluxService {
 
     const flux = `
       from(bucket: "${env.influxBucket}")
-        |> range(start: -15m)
+        |> range(start: -${env.dashboardLatestMaxAgeSec}s)
         |> filter(fn: (r) => r._measurement == "gas_reading")
         ${deviceFilter}
-        |> pivot(rowKey: ["_time","device_id","risk_label","rl_action"], columnKey: ["_field"], valueColumn: "_value")
+        |> pivot(rowKey: ["_time","device_id"], columnKey: ["_field"], valueColumn: "_value")
+        |> group()
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: 1)
     `;
@@ -87,17 +88,18 @@ class InfluxService {
       ? `|> filter(fn: (r) => r.device_id == "${deviceId}")`
       : "";
 
-    const flux = `
+    const buildFlux = (rangeClause: string) => `
       from(bucket: "${env.influxBucket}")
-        |> range(start: -${minutes}m)
+        |> range(${rangeClause})
         |> filter(fn: (r) => r._measurement == "gas_reading")
         ${deviceFilter}
         |> aggregateWindow(every: ${sampleEvery}s, fn: last, createEmpty: false)
-        |> pivot(rowKey: ["_time","device_id","risk_label","rl_action"], columnKey: ["_field"], valueColumn: "_value")
+        |> pivot(rowKey: ["_time","device_id"], columnKey: ["_field"], valueColumn: "_value")
+        |> group()
         |> sort(columns: ["_time"], desc: false)
     `;
 
-    return new Promise((resolve, reject) => {
+    const queryHistory = (flux: string) => new Promise<GasReading[]>((resolve, reject) => {
       const rows: GasReading[] = [];
       this.queryApi.queryRows(flux, {
         next: (row, meta) => {
@@ -119,6 +121,9 @@ class InfluxService {
         complete: () => resolve(rows),
       });
     });
+
+    const rows = await queryHistory(buildFlux(`start: -${minutes}m`));
+    return rows;
   }
 }
 

@@ -135,6 +135,8 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
+      influxdb:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - iot_net
@@ -174,6 +176,7 @@ services:
       - LSTM_MODEL_PATH=/app/ml/lstm/best_lstm_uci.keras
       - LSTM_ALERT_THRESHOLD=0.7
       - LSTM_WARNING_THRESHOLD=0.4
+      - RESET_SPARK_CHECKPOINT_ON_START=${RESET_SPARK_CHECKPOINT_ON_START:-false}
     depends_on:
       kafka:
         condition: service_healthy
@@ -181,7 +184,15 @@ services:
         condition: service_healthy
     volumes:
       - ./processing:/app
-    command: [ "python", "spark-streaming/jobs/stream_processor.py" ]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ "$$RESET_SPARK_CHECKPOINT_ON_START" = "true" ]; then
+          echo "Resetting Spark checkpoint at $$SPARK_CHECKPOINT_LOCATION"
+          rm -rf "$$SPARK_CHECKPOINT_LOCATION"
+        fi
+        exec python spark-streaming/jobs/stream_processor.py
     restart: unless-stopped
     networks:
       - iot_net
@@ -217,7 +228,7 @@ services:
     container_name: frontend
     environment:
       # Must be reachable FROM THE BROWSER (host machine), not from inside Docker
-      - BACKEND_BASE_URL=http://localhost:3000
+      - BACKEND_BASE_URL=http://127.0.0.1:3000
       - FRONTEND_PORT=8080
     ports:
       - "8080:8080"
