@@ -1,0 +1,79 @@
+% ============================================================
+%  Chương 5: Kết luận và hướng phát triển
+% ============================================================
+
+\section{Kết luận}
+
+Khóa luận này đã trình bày việc thiết kế, triển khai và đánh giá một \textbf{nền tảng IoT 4 lớp} cho phát hiện và ứng phó rò rỉ khí gas thông minh. So với các hệ thống ngưỡng tĩnh truyền thống, đề tài đạt được những kết quả chính sau:
+
+\subsection{Những kết quả đạt được}
+
+\begin{enumerate}
+  \item \textbf{Bộ mô phỏng vật lý trạng thái có thể tái tạo}: Thay thế generator ngẫu nhiên đơn giản bằng máy trạng thái vật lý (NORMAL → LEAK\_SLOW/FAST → VENTILATING) với các phương trình động lực học thực tế. Bộ mô phỏng phát nhãn ground-truth để huấn luyện và đánh giá mô hình, đồng thời có thể tái tạo hoàn toàn thông qua RNG seed.
+
+  \item \textbf{Mô hình LSTM dự báo tiên tiến}: Chuyển từ bài toán phân loại trạng thái hiện tại sang bài toán dự báo xác suất rủi ro trong 5 phút tới. Mô hình huấn luyện trên dữ liệu tổng hợp từ bộ mô phỏng và cung cấp cảnh báo sớm trước khi khí đạt ngưỡng nguy hiểm. Cơ chế fallback trend extrapolation đảm bảo hệ thống hoạt động ngay cả khi chưa có mô hình được huấn luyện.
+
+  \item \textbf{Bộ điều khiển PPO học tăng cường}: Học chính sách tối ưu trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với khả năng lựa chọn hành động đa dạng (NO\_OP/ALERT/FAN/VALVE). Kết quả benchmark cho thấy RL controller giảm peak gas đáng kể so với bộ điều khiển ngưỡng, nhờ có khả năng kích hoạt biện pháp can thiệp vật lý.
+
+  \item \textbf{Pipeline streaming hiện đại}: Kiến trúc MQTT → Kafka → Spark cho phép xử lý dữ liệu cảm biến gần thời gian thực với độ trễ end-to-end dưới 300 ms, có khả năng mở rộng ngang cho nhiều thiết bị.
+
+  \item \textbf{Tích hợp Telegram chatbot}: Cung cấp kênh cảnh báo đẩy và điều khiển từ xa không cần cài ứng dụng riêng, tăng tiếp cận với người dùng thông thường.
+
+  \item \textbf{Phương pháp đánh giá hai lượt (oracle + controller)}: Cung cấp phương pháp so sánh công bằng và tái tạo được giữa các bộ điều khiển, dựa trên các chỉ số có ý nghĩa thực tiễn (lead time, miss rate, peak gas).
+
+  \item \textbf{Triển khai Docker Compose hoàn chỉnh}: Toàn bộ hệ thống 10 service có thể khởi động bằng một lệnh duy nhất, đảm bảo khả năng tái tạo và đơn giản hóa quá trình demo và kiểm tra.
+\end{enumerate}
+
+\subsection{Bài học kinh nghiệm}
+
+\begin{itemize}
+  \item \textbf{Chất lượng bộ mô phỏng quyết định chất lượng mô hình}: Khi không có dữ liệu thực, bộ mô phỏng là nguồn dữ liệu duy nhất. Đầu tư vào mô hình vật lý chính xác (thay vì random uniform) cải thiện đáng kể khả năng tổng quát hóa của mô hình LSTM và RL.
+
+  \item \textbf{Fallback mechanism quan trọng cho hệ thống thực}: Mô hình ML có thể chưa được huấn luyện hoặc bị lỗi trong production. Cơ chế fallback đơn giản nhưng deterministic (trend extrapolation, rule-based policy) đảm bảo hệ thống không hoàn toàn sụp đổ khi ML component gặp vấn đề.
+
+  \item \textbf{Phương pháp đánh giá phải phù hợp với bài toán thực tế}: Accuracy không đủ để đánh giá hệ thống cảnh báo. Lead time và miss rate phản ánh trực tiếp giá trị thực tiễn của hệ thống.
+
+  \item \textbf{Docker Compose giúp tái tạo kết quả}: Môi trường nhất quán là điều kiện tiên quyết cho nghiên cứu tái tạo được. Việc containerize toàn bộ hệ thống từ sớm tiết kiệm nhiều thời gian debug về sau.
+\end{itemize}
+
+\section{Hướng phát triển}
+
+\subsection{Ngắn hạn}
+
+\begin{enumerate}
+  \item \textbf{Tích hợp phần cứng thực}: Thay thế bộ mô phỏng bằng ESP32 thực tế với cảm biến MQ-135 và DHT22 trong môi trường phòng thí nghiệm có kiểm soát. Điều này cho phép đánh giá hiệu năng mô hình trên dữ liệu cảm biến thực, bao gồm nhiễu, drift và các đặc tính quá độ thực tế.
+
+  \item \textbf{Cải thiện mô hình LSTM}: Thử nghiệm các kiến trúc nâng cao hơn như Transformer-based time series (TSMixer, PatchTST) để so sánh với LSTM đơn giản. Đặc biệt, \textit{Temporal Fusion Transformer} (TFT) có khả năng xử lý nhiều chuỗi thời gian có tương quan tốt hơn.
+
+  \item \textbf{Đa thiết bị}: Mở rộng hệ thống để hỗ trợ nhiều thiết bị ESP32 trong cùng mạng nhà ở, kết hợp thông tin từ nhiều điểm cảm biến để phát hiện vùng rò rỉ (source localization).
+
+  \item \textbf{Fine-tuning RL trên dữ liệu thực}: Sau khi có phần cứng thực, tiếp tục huấn luyện (fine-tune) RL agent trong môi trường thực để thu hẹp khoảng cách giữa sim-to-real gap.
+\end{enumerate}
+
+\subsection{Trung hạn}
+
+\begin{enumerate}
+  \item \textbf{Federated Learning}: Huấn luyện mô hình phân tán trên nhiều thiết bị/hộ gia đình mà không cần chia sẻ dữ liệu thô, giải quyết vấn đề privacy trong IoT.
+
+  \item \textbf{Edge Inference}: Triển khai mô hình LSTM rút gọn (quantized, TensorFlow Lite) trực tiếp trên ESP32 để giảm độ trễ và không phụ thuộc vào kết nối mạng cho suy luận cơ bản.
+
+  \item \textbf{Tích hợp hệ thống nhà thông minh}: Kết nối với các nền tảng như Home Assistant, Google Home để tích hợp vào hệ sinh thái nhà thông minh rộng hơn, điều khiển đèn, cửa sổ, điều hòa song song với phát hiện khí gas.
+
+  \item \textbf{Multi-agent RL}: Mở rộng sang kiến trúc multi-agent khi có nhiều thiết bị, trong đó mỗi agent kiểm soát khu vực của mình nhưng có thể phối hợp với các agent khác.
+\end{enumerate}
+
+\subsection{Dài hạn}
+
+\begin{enumerate}
+  \item \textbf{Nhận diện loại khí}: Kết hợp dữ liệu từ mảng cảm biến đa loại (e-nose) để phân biệt loại khí (LPG, CO, NO$_2$), cung cấp thông tin chính xác hơn cho lực lượng cứu hỏa.
+
+  \item \textbf{Tích hợp thị giác máy tính}: Kết hợp camera hồng ngoại để phát hiện ngọn lửa nhỏ đồng thời với dữ liệu khí gas, tăng độ tin cậy tổng thể của hệ thống cảnh báo.
+
+  \item \textbf{Chuẩn hóa và thương mại hóa}: Đáp ứng các tiêu chuẩn an toàn liên quan (TCVN, IEC 60079) để có thể triển khai trong môi trường thương mại và công nghiệp.
+\end{enumerate}
+
+\section{Tổng kết}
+
+Đề tài đã chứng minh tính khả thi của việc áp dụng học tăng cường và dự báo chuỗi thời gian LSTM vào bài toán phát hiện và ứng phó rò rỉ khí gas thông minh trong nhà ở. Kiến trúc 4 lớp được thiết kế cân bằng giữa tính học thuật (có thể tái tạo, đánh giá khoa học) và tính thực tiễn (Docker Compose, Telegram bot, dashboard thời gian thực). Phương pháp đánh giá hai lượt oracle cung cấp framework so sánh công bằng có thể áp dụng cho các nghiên cứu tương tự.
+
+Kết quả benchmark khẳng định rằng cách tiếp cận kết hợp dự báo LSTM + điều khiển RL vượt trội so với phương pháp ngưỡng tĩnh trên các chỉ số thực tiễn quan trọng, mở ra hướng phát triển đầy tiềm năng cho các hệ thống an toàn thông minh thế hệ tiếp theo.

@@ -1,0 +1,403 @@
+% ============================================================
+%  Chương 3: Phương pháp thực hiện
+% ============================================================
+
+\section{Tổng quan kiến trúc hệ thống}
+
+Hệ thống được thiết kế theo kiến trúc \textbf{4 lớp} phân tầng rõ ràng, giúp tách biệt trách nhiệm giữa các thành phần và hỗ trợ mở rộng độc lập:
+
+\begin{enumerate}
+  \item \textbf{Lớp thiết bị (Device Layer)}: ESP32 hoặc bộ mô phỏng phần mềm thu thập và publish dữ liệu cảm biến.
+  \item \textbf{Lớp truyền thông (Communication Layer)}: Mosquitto MQTT broker và dịch vụ cầu nối MQTT-Kafka.
+  \item \textbf{Lớp xử lý (Processing Layer)}: Apache Spark Structured Streaming tích hợp LSTM forecaster và RL controller.
+  \item \textbf{Lớp ứng dụng (Application Layer)}: API Node.js, dashboard web, Grafana và Telegram bot.
+\end{enumerate}
+
+Sơ đồ tổng thể kiến trúc 4 tầng kèm luồng dữ liệu giữa các thành phần được thể hiện trong Hình~\ref{fig:architecture}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{architecture.png}
+  \caption{Kiến trúc hệ thống 4 tầng. Mỗi dải màu đại diện một tầng; mũi tên thể hiện luồng dữ liệu theo giao thức (MQTT, Kafka produce/consume, write database, alert events). Tầng xử lý là điểm hội tụ của hai mô hình ML (LSTM forecaster + PPO agent) trên cùng một Spark stream.}
+  \label{fig:architecture}
+\end{figure}
+
+\section{Lớp thiết bị}
+
+\subsection{Firmware ESP32}
+
+Firmware ESP32 được viết bằng ngôn ngữ C++ sử dụng Arduino framework với thư viện PubSubClient cho MQTT. ESP32 đọc dữ liệu từ:
+\begin{itemize}
+  \item Cảm biến MQ (qua cổng ADC): nồng độ khí gas (ppm)
+  \item Cảm biến DHT22: nhiệt độ (°C) và độ ẩm (\%)
+\end{itemize}
+
+Mỗi giây (1 Hz), firmware đóng gói dữ liệu thành JSON và publish lên topic \texttt{sensors/gas}:
+
+\begin{lstlisting}[language=Python, caption={Cấu trúc payload JSON từ thiết bị}]
+{
+  "device_id": "esp32-lab-01",
+  "gas_ppm": 125.43,
+  "temperature_c": 28.12,
+  "humidity_percent": 61.5,
+  "event_ts": 1703123456789
+}
+\end{lstlisting}
+
+\subsection{Bộ mô phỏng cảm biến (Sensor Simulator)}
+
+Do điều kiện thực nghiệm, bộ mô phỏng phần mềm được xây dựng để thay thế phần cứng trong quá trình huấn luyện mô hình và đánh giá benchmark. Bộ mô phỏng triển khai một \textbf{máy trạng thái vật lý} (physical state machine) với 4 trạng thái:
+
+\begin{itemize}
+  \item \textbf{NORMAL}: Nồng độ nền 50–150 ppm, dao động Gaussian nhỏ. Hàm cập nhật:
+  \[gas_t = gas_{t-1} + 0.1(60 - gas_{t-1}) \cdot dt + \mathcal{N}(0, 3) \cdot dt\]
+
+  \item \textbf{LEAK\_SLOW}: Rò rỉ chậm, tốc độ tăng tuyến tính $\sim$5 ppm/s:
+  \[gas_t = gas_{t-1} + 5 \cdot dt + \mathcal{N}(0, 2) \cdot dt\]
+
+  \item \textbf{LEAK\_FAST}: Rò rỉ nhanh (vỡ ống), tăng theo hàm mũ:
+  \[gas_t = gas_{t-1} \cdot e^{0.04 \cdot dt} + 8 \cdot dt + \mathcal{N}(0, 3) \cdot dt\]
+
+  \item \textbf{VENTILATING}: Sau khi có hành động can thiệp, khí giảm theo hàm mũ:
+  \[gas_t = \max(60, gas_{t-1} \cdot e^{-0.03 \cdot dt} - 0.5 \cdot dt)\]
+\end{itemize}
+
+Xác suất chuyển trạng thái (stochastic transitions) được tham số hóa qua biến môi trường \texttt{SIM\_LEAK\_PROB\_PER\_MIN} (mặc định 5\% mỗi phút). Trong pha NORMAL, 70\% trường hợp chuyển sang LEAK\_SLOW và 30\% chuyển sang LEAK\_FAST.
+
+Bộ mô phỏng cũng publish hai trường nhãn ground-truth:
+\begin{itemize}
+  \item \texttt{\_leak\_state}: Trạng thái thực tế (chỉ dùng cho đánh giá).
+  \item \texttt{\_seconds\_to\_critical}: Số giây đến khi nồng độ đạt 1000 ppm (ước tính).
+\end{itemize}
+
+\section{Lớp truyền thông}
+
+\subsection{Mosquitto MQTT Broker}
+
+Mosquitto là MQTT broker mã nguồn mở nhẹ của Eclipse Foundation. Trong hệ thống, Mosquitto được cấu hình:
+\begin{itemize}
+  \item Port 1883 cho kết nối không mã hóa (internal Docker network).
+  \item Persistence enabled để không mất message khi broker restart.
+  \item Maximum connections không giới hạn cho môi trường phát triển.
+\end{itemize}
+
+\subsection{MQTT-Kafka Bridge}
+
+Dịch vụ cầu nối (\texttt{mqtt\_kafka\_bridge.py}) đóng vai trò dịch chuyển message giữa hai giao thức:
+
+\begin{lstlisting}[language=Python, caption={Logic bridge đơn giản hóa}]
+def on_message(client, userdata, msg):
+    payload = json.loads(msg.payload)
+    # Validate và thêm metadata
+    payload['ingested_at'] = int(time.time() * 1000)
+    # Publish lên Kafka
+    producer.produce(
+        topic='gas.raw.sensor',
+        key=payload['device_id'],
+        value=json.dumps(payload),
+        callback=delivery_report
+    )
+    producer.poll(0)
+\end{lstlisting}
+
+Bridge subscribe vào MQTT topic \texttt{sensors/gas} và republish lên Kafka topic \texttt{gas.raw.sensor} với key là \texttt{device\_id} để đảm bảo ordering per device trong Kafka partition.
+
+\section{Lớp xử lý}
+
+\subsection{Spark Structured Streaming Pipeline}
+
+File \texttt{stream\_processor.py} là điểm vào của lớp xử lý. Pipeline Spark được thiết kế theo các bước:
+
+\textbf{Bước 1 – Đọc từ Kafka:}
+\begin{lstlisting}[language=Python, caption={Đọc stream từ Kafka}]
+raw_stream = (
+    spark.readStream
+    .format("kafka")
+    .option("kafka.bootstrap.servers", KAFKA_BROKERS)
+    .option("subscribe", "gas.raw.sensor")
+    .option("startingOffsets", "latest")
+    .load()
+)
+\end{lstlisting}
+
+\textbf{Bước 2 – Parse và Feature Extraction:}
+
+Mỗi reading được parse từ JSON. Để đưa dữ liệu vào LSTM (cần chuỗi 60 giây), pipeline duy trì một sliding window per \texttt{device\_id} trong memory. Python UDF nhận chuỗi hiện tại và gọi forecaster:
+
+\begin{lstlisting}[language=Python, caption={Gọi LSTM forecaster trong Spark}]
+@udf(returnType=FloatType())
+def predict_risk(gas, temp, hum):
+    return forecaster.predict(device_id, gas, temp, hum)
+\end{lstlisting}
+
+\textbf{Bước 3 – Gọi RL Controller:}
+
+Sau khi có xác suất rủi ro từ LSTM, Spark gọi RL agent để chọn hành động:
+\begin{lstlisting}[language=Python, caption={Gọi RL agent}]
+action, action_name = rl_agent.choose(
+    device_id, gas, temp, hum, predicted_risk
+)
+\end{lstlisting}
+
+\textbf{Bước 4 – Ghi kết quả:}
+\begin{itemize}
+  \item Ghi vào InfluxDB measurement \texttt{gas\_readings} mọi reading kèm xác suất rủi ro và hành động.
+  \item Nếu action $\neq$ NO\_OP, publish lên Kafka topic \texttt{gas.alert.events}.
+\end{itemize}
+
+\subsection{LSTM Forecaster}
+
+\subsubsection{Kiến trúc mô hình}
+
+Mô hình LSTM dự báo được xây dựng bằng Keras/TensorFlow với kiến trúc nhỏ gọn phù hợp với suy luận thời gian thực:
+
+\begin{lstlisting}[language=Python, caption={Định nghĩa kiến trúc LSTM}]
+inp = tf.keras.layers.Input(shape=(60, 3))
+x = tf.keras.layers.LSTM(32, return_sequences=False)(inp)
+x = tf.keras.layers.Dropout(0.2)(x)
+x = tf.keras.layers.Dense(16, activation="relu")(x)
+out = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+model = tf.keras.Model(inp, out)
+model.compile(
+    optimizer=Adam(1e-3),
+    loss="binary_crossentropy",
+    metrics=["accuracy", Precision(), Recall()]
+)
+\end{lstlisting}
+
+Tổng số tham số: $\sim$5,000 – đủ nhỏ để suy luận trong vài millisecond. Sơ đồ khối các lớp được mô tả ở Hình~\ref{fig:lstm_arch} (Chương~\ref{c:cosolythuyet}).
+
+\subsubsection{Quy trình huấn luyện}
+
+\textbf{Sinh dữ liệu}: Chạy bộ mô phỏng trong $N$ giờ (mặc định 4 giờ) với seed cố định để tạo trace xác định. Trace có dạng mảng $(T, 4)$: $(gas, temp, hum, state\_int)$.
+
+\textbf{Xây dựng dataset}: Với mỗi vị trí $i$ trong trace:
+\begin{itemize}
+  \item $X[i]$ = chuỗi 60 giây chuẩn hóa kết thúc tại $t$: $feats[i:i+60] / [2000, 60, 100]$
+  \item $y[i] = 1$ nếu $\max(gas[i+61:i+361]) > 1000$ else $0$
+\end{itemize}
+
+\textbf{Phân chia train/test}: Phân chia theo thứ tự thời gian (80/20), không xáo trộn để tránh data leakage.
+
+\textbf{Xử lý mất cân bằng}: Áp dụng class weight với hệ số:
+\[w_{pos} = \frac{1 - p_{pos}}{p_{pos}}, \quad w_{neg} = 1.0\]
+
+trong đó $p_{pos}$ là tỷ lệ mẫu positive trong tập huấn luyện.
+
+\subsubsection{Fallback mechanism}
+
+Khi mô hình Keras chưa được huấn luyện (file \texttt{.keras} chưa tồn tại), forecaster tự động sử dụng \textbf{trend extrapolation fallback}. Cơ chế này ước tính slope tuyến tính trên 30 mẫu gần nhất bằng \texttt{numpy.polyfit}, sau đó thực hiện ngoại suy tới chân trời $H=300$\,giây. Nếu slope vượt 0{,}5 ppm/s, fallback bổ sung thêm nhánh \textbf{ngoại suy mũ} (exponential) bằng cách ước lượng hệ số tăng trưởng trung bình trên 15 mẫu cuối. Giá trị dự báo cuối cùng là \texttt{max(linear, exp)} và được ánh xạ sang xác suất qua hàm logistic với biên (margin) $200$\,ppm xung quanh ngưỡng nguy hiểm. Cơ chế này đảm bảo hệ thống vẫn cho ra xác suất dự báo hợp lý ngay cả khi mô hình Keras chưa sẵn sàng, đồng thời chống lại các trường hợp tăng phi tuyến (LEAK\_FAST) mà phép ngoại suy tuyến tính sẽ đánh giá thấp.
+
+\subsection{RL Controller (PPO)}
+
+\subsubsection{Môi trường GasLeakEnv}
+
+\texttt{GasLeakEnv} kế thừa từ \texttt{gymnasium.Env} và bao bọc bộ mô phỏng vật lý:
+
+\begin{lstlisting}[language=Python, caption={Cấu trúc GasLeakEnv (đã được đơn giản hoá)}]
+class GasLeakEnv(gymnasium.Env):
+    # Quan sát 8 chiều, đã chuẩn hoá về [0,1]:
+    #   gas_norm, temp_norm, hum_norm, slope_norm,
+    #   p_critical_5min, fan_on, valve_closed, time_since_action
+    observation_space = Box(low=0.0, high=1.0, shape=(8,), dtype=np.float32)
+    action_space = Discrete(4)  # 0=NO_OP, 1=ALERT, 2=FAN_ON, 3=CLOSE_VALVE
+
+    def step(self, action):
+        # Áp dụng hành động (kèm chi phí khi sai bối cảnh)
+        if action == 2 and not self.fan_on:
+            self.fan_on = True
+        if action == 3 and not self.valve_closed:
+            self.valve_closed = True
+            if self.world.state in (LEAK_SLOW, LEAK_FAST):
+                self.world.state = VENTILATING
+        # Cập nhật vật lý (FAN làm khí giảm 1.5%/giây ngay cả trong leak)
+        STEP_FN[self.world.state](self.world, 1.0)
+        if self.fan_on and self.world.state != VENTILATING:
+            self.world.gas = max(50.0, self.world.gas * 0.985)
+        _maybe_transition(self.world, 1.0)
+        reward = self._compute_reward(action)
+        return self._observe(), reward, False, self.t >= self.T, {}
+\end{lstlisting}
+
+\textbf{Vector quan sát} có 8 đặc trưng, mỗi thành phần được chuẩn hoá về $[0,1]$ để policy network học ổn định: nồng độ khí, nhiệt độ, độ ẩm, độ dốc (\textit{slope}) ước tính trên 30 mẫu cuối, xác suất rủi ro 5 phút $p_{5\min}$ từ LSTM, trạng thái quạt, trạng thái van, và thời gian kể từ hành động cuối. Hai biến trạng thái nội bộ (\texttt{fan\_on}, \texttt{valve\_closed}) cho phép policy biết các can thiệp đã được kích hoạt và không lặp lại không cần thiết.
+
+\textbf{Hàm reward} được thiết kế theo nguyên tắc \textit{asymmetric cost}: hậu quả của việc bỏ sót rò rỉ (gas vượt ngưỡng nguy hiểm) phải nặng hơn rất nhiều so với cảnh báo sai:
+\begin{table}[H]
+\centering
+\caption{Bộ hệ số reward shaping (tham chiếu code \texttt{processing/ml/rl/gas\_env.py})}
+\label{tab:reward_shape}
+\begin{tabular}{lr}
+\toprule
+\textbf{Tình huống} & \textbf{Reward} \\
+\midrule
+Mỗi bước có $gas \geq 1000$\,ppm                    & $-50$ \\
+FAN\_ON hoặc CLOSE\_VALVE xảy ra trong leak (thưởng) & $+10$ \\
+ALERT\_USER khi trạng thái NORMAL (false positive)  & $-3$ \\
+FAN\_ON khi trạng thái NORMAL                       & $-15$ \\
+CLOSE\_VALVE khi trạng thái NORMAL                  & $-25$ \\
+Chi phí mỗi bước (step cost)                       & $-0{,}05$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Hệ số $-50$ trong tình huống đỉnh và $-25$ cho hành động đóng van sai được chọn lớn một cách có chủ ý: $-25$ chính là cái giá đủ cao để agent không "lười" đóng van mọi lúc -- ngay cả khi đóng van triệt tiêu rủi ro rò rỉ -- vì sai trong NORMAL sẽ ngắt nguồn cung cấp khí gas của hộ gia đình, một thiệt hại trải nghiệm thực tế đáng kể.
+
+\subsubsection{Huấn luyện PPO}
+
+\begin{lstlisting}[language=Python, caption={Cấu hình PPO training}]
+env = make_vec_env(
+    lambda: GasLeakEnv(episode_seconds=1800),
+    n_envs=4,   # 4 môi trường song song
+    seed=42
+)
+model = PPO(
+    "MlpPolicy", env,
+    n_steps=512,
+    batch_size=128,
+    gae_lambda=0.95,
+    gamma=0.99,
+    learning_rate=3e-4,
+    ent_coef=0.01  # entropy bonus để khám phá
+)
+model.learn(total_timesteps=200_000)
+model.save("processing/ml/rl/ppo_gas_agent.zip")
+\end{lstlisting}
+
+4 môi trường song song (parallel envs) giúp tăng diversity của dữ liệu huấn luyện và giảm thời gian training. Mỗi episode kéo dài 1800 giây (30 phút) mô phỏng.
+
+Sơ đồ khối toàn bộ mạng PPO (kiến trúc actor-critic dùng \texttt{MlpPolicy} mặc định của Stable-Baselines3) được thể hiện trong Hình~\ref{fig:ppo_arch}. Trunk dùng chung gồm hai lớp Dense 64 đơn vị, kích hoạt $\tanh$; trên đó tách thành hai đầu (head) độc lập -- policy head trả về phân phối xác suất trên 4 hành động qua softmax, value head trả về giá trị $V_\phi(s)$ vô hướng. Toàn bộ mạng có khoảng 5{,}000 tham số, nhẹ tương đương LSTM forecaster.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{ppo_arch.png}
+  \caption{Sơ đồ khối kiến trúc PPO actor-critic (Stable-Baselines3 \texttt{MlpPolicy}). State 8 chiều được đưa qua trunk Dense 64-Dense 64 (tanh), sau đó tách thành policy head (4 logits, softmax) và value head (scalar). Mũi tên màu tím khép kín vòng lặp tương tác agent--environment.}
+  \label{fig:ppo_arch}
+\end{figure}
+
+\subsubsection{Fallback mechanism}
+
+Tương tự LSTM, RL agent có một \textbf{rule-based fallback} kích hoạt khi file PPO chưa tồn tại hoặc tải lỗi. Fallback bám sát triết lý của hàm reward (ưu tiên an toàn, thận trọng với hành động đắt), gồm năm luật được đánh giá theo thứ tự dừng-đầu-tiên:
+\begin{enumerate}
+  \item Nếu $gas > 800$\,ppm và van chưa đóng $\Rightarrow$ CLOSE\_VALVE.
+  \item Nếu $p_{5\min} > 0{,}7$ và van chưa đóng $\Rightarrow$ CLOSE\_VALVE.
+  \item Nếu $p_{5\min} > 0{,}4$ hoặc slope $> 1$\,ppm/s, và quạt chưa bật $\Rightarrow$ FAN\_ON.
+  \item Nếu $p_{5\min} > 0{,}3$ $\Rightarrow$ ALERT\_USER.
+  \item Ngược lại $\Rightarrow$ NO\_OP.
+\end{enumerate}
+Quy tắc này tham chiếu cả nồng độ tức thời \emph{và} tín hiệu dự báo từ LSTM, đảm bảo hệ thống vẫn có khả năng phản ứng đa cấp ngay cả khi PPO chưa sẵn sàng -- ví dụ ở giai đoạn đầu triển khai hoặc sau khi cập nhật model.
+
+\section{Lớp ứng dụng}
+
+\subsection{Backend API (Node.js + TypeScript)}
+
+Backend được xây dựng bằng Node.js với TypeScript, sử dụng Express.js framework. Kiến trúc phân lớp rõ ràng:
+
+\begin{itemize}
+  \item \textbf{Controllers}: Xử lý HTTP request/response (\texttt{dashboard.controller.ts}).
+  \item \textbf{Services}: Business logic và kết nối database (\texttt{influx.service.ts}, \texttt{postgres.service.ts}).
+  \item \textbf{Routes}: Định nghĩa các endpoint API.
+\end{itemize}
+
+Các REST endpoint chính:
+\begin{itemize}
+  \item \texttt{GET /api/dashboard/latest}: Đọc reading mới nhất từ InfluxDB.
+  \item \texttt{GET /api/dashboard/history}: Lịch sử nồng độ khí trong khoảng thời gian.
+  \item \texttt{GET /api/dashboard/alerts}: Lịch sử cảnh báo từ PostgreSQL.
+  \item \texttt{GET /api/dashboard/actions}: Lịch sử hành động RL từ PostgreSQL.
+  \item \texttt{GET /api/events} (SSE): Server-Sent Events cho cập nhật thời gian thực.
+\end{itemize}
+
+Backend cũng consume từ Kafka topic \texttt{gas.alert.events} để phát SSE đến browser và trigger Telegram notification.
+
+\subsection{Frontend Dashboard}
+
+Frontend sử dụng Express.js với EJS template engine, cung cấp:
+
+\begin{itemize}
+  \item \textbf{Gauge chart}: Hiển thị xác suất rủi ro 5 phút (0–100\%) cập nhật realtime qua SSE.
+  \item \textbf{Time-series chart}: Biểu đồ nồng độ khí gas theo thời gian thực.
+  \item \textbf{RL Action card}: Hiển thị hành động hiện tại của bộ điều khiển RL.
+  \item \textbf{Alert history table}: Bảng lịch sử cảnh báo gần nhất.
+\end{itemize}
+
+JavaScript phía client kết nối SSE endpoint và cập nhật các thành phần UI không cần reload trang.
+
+\subsection{Telegram Bot}
+
+Telegram Bot được tích hợp vào Backend service. Khi nhận event cảnh báo từ Kafka consumer:
+
+\begin{lstlisting}[language=Python, caption={Gửi cảnh báo qua Telegram}]
+async def send_alert(gas_ppm, risk, action):
+    message = (
+        f"⚠️ CẢNH BÁO KHÍ GAS\n"
+        f"Nồng độ: {gas_ppm:.1f} ppm\n"
+        f"Rủi ro 5 phút: {risk*100:.1f}%\n"
+        f"Hành động: {action}"
+    )
+    await bot.send_message(chat_id=CHAT_ID, text=message)
+\end{lstlisting}
+
+Người dùng cũng có thể tương tác với bot qua các lệnh:
+\begin{itemize}
+  \item \texttt{/status}: Xem trạng thái hiện tại của hệ thống.
+  \item \texttt{/history}: Xem 5 cảnh báo gần nhất.
+  \item \texttt{/subscribe}/\texttt{/unsubscribe}: Đăng ký/hủy nhận cảnh báo tự động.
+\end{itemize}
+
+\subsection{Grafana Dashboard}
+
+Grafana kết nối trực tiếp với InfluxDB để hiển thị các biểu đồ phân tích:
+\begin{itemize}
+  \item Biểu đồ nồng độ khí gas, nhiệt độ, độ ẩm theo thời gian.
+  \item Biểu đồ xác suất rủi ro dự báo theo thời gian.
+  \item Phân phối hành động RL (histogram).
+  \item Thống kê số cảnh báo theo giờ/ngày.
+\end{itemize}
+
+Dashboard được provisioning tự động khi khởi động (thông qua thư mục \texttt{infrastructure/grafana/provisioning/}).
+
+\section{Thiết kế Database}
+
+\subsection{Schema PostgreSQL}
+
+\begin{lstlisting}[language=SQL, caption={Schema lịch sử cảnh báo và hành động}]
+CREATE TABLE alert_events (
+    id          BIGSERIAL PRIMARY KEY,
+    device_id   VARCHAR(64) NOT NULL,
+    event_ts    TIMESTAMPTZ NOT NULL,
+    gas_ppm     REAL NOT NULL,
+    risk_score  REAL,          -- P(critical in 5min)
+    alert_level VARCHAR(16),   -- 'LOW', 'MEDIUM', 'HIGH'
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE action_events (
+    id          BIGSERIAL PRIMARY KEY,
+    device_id   VARCHAR(64) NOT NULL,
+    event_ts    TIMESTAMPTZ NOT NULL,
+    action_id   SMALLINT NOT NULL,  -- 0-3
+    action_name VARCHAR(32) NOT NULL,
+    gas_ppm     REAL NOT NULL,
+    risk_score  REAL,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_alert_device_ts ON alert_events(device_id, event_ts DESC);
+CREATE INDEX idx_action_device_ts ON action_events(device_id, event_ts DESC);
+\end{lstlisting}
+
+\section{Triển khai với Docker Compose}
+
+Toàn bộ hệ thống được định nghĩa trong \texttt{docker-compose.yml} với network nội bộ \texttt{iot-network}. Thứ tự khởi động được kiểm soát qua \texttt{depends\_on} với \texttt{condition: service\_healthy}:
+
+\begin{enumerate}
+  \item Mosquitto, Zookeeper khởi động đầu tiên.
+  \item Kafka khởi động sau Zookeeper healthy.
+  \item InfluxDB, PostgreSQL khởi động song song.
+  \item mqtt-kafka-bridge, device-simulator khởi động sau Mosquitto và Kafka healthy.
+  \item processing-engine khởi động sau Kafka, InfluxDB, PostgreSQL healthy.
+  \item Backend khởi động sau processing-engine.
+  \item Frontend, Grafana khởi động cuối.
+\end{enumerate}
+
+Tất cả biến cấu hình (broker URLs, credentials, topic names) được quản lý qua file \texttt{.env}, không hardcode trong code.

@@ -1,0 +1,727 @@
+% ============================================================
+%  Chương 4: Thực nghiệm, đánh giá và thảo luận
+% ============================================================
+
+Chương này trình bày kết quả thực nghiệm của hệ thống, bao gồm quá trình huấn luyện hai mô hình học máy cốt lõi (LSTM forecaster và PPO RL controller) và kết quả đánh giá so sánh giữa ba bộ điều khiển khác nhau. Toàn bộ thực nghiệm được thiết kế theo nguyên tắc \textit{khả năng tái tạo}: mọi thí nghiệm đều sử dụng seed cố định, các tham số được khai báo rõ ràng, và mã nguồn benchmark được công bố trong repository của đề tài.
+
+\section{Môi trường thực nghiệm}
+
+\subsection{Cấu hình phần cứng và phần mềm}
+
+Toàn bộ thí nghiệm trong đề tài được thực hiện trên một máy trạm cá nhân với cấu hình tiêu chuẩn, không sử dụng GPU chuyên dụng. Lựa chọn này có chủ đích nhằm chứng minh hệ thống có thể vận hành hiệu quả trên phần cứng phổ thông, phù hợp với bối cảnh triển khai trong hộ gia đình hoặc doanh nghiệp nhỏ.
+
+\begin{table}[H]
+\centering
+\caption{Cấu hình môi trường thực nghiệm}
+\label{tab:env_hardware}
+\begin{tabular}{ll}
+\toprule
+\textbf{Thành phần} & \textbf{Chi tiết} \\
+\midrule
+CPU     & Intel Core i7 / AMD Ryzen 7 (8 cores) \\
+RAM     & 16 GB DDR4 \\
+Storage & 512 GB SSD NVMe \\
+GPU     & Không sử dụng (CPU-only) \\
+OS      & Ubuntu 22.04 LTS / Windows 11 + WSL2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Stack phần mềm được lựa chọn dựa trên các tiêu chí: (i) mã nguồn mở để đảm bảo tính tái tạo, (ii) cộng đồng phát triển lớn để có hỗ trợ lâu dài, và (iii) tương thích tốt với môi trường containerized.
+
+\begin{table}[H]
+\centering
+\caption{Phiên bản các thư viện chính}
+\label{tab:env_software}
+\begin{tabular}{ll}
+\toprule
+\textbf{Thư viện} & \textbf{Phiên bản} \\
+\midrule
+Python              & 3.11 \\
+TensorFlow          & $\geq$ 2.15 \\
+Stable-Baselines3   & $\geq$ 2.0 \\
+Gymnasium           & $\geq$ 0.29 \\
+PySpark             & $\geq$ 3.5 \\
+confluent-kafka     & $\geq$ 2.3 \\
+influxdb-client     & $\geq$ 1.39 \\
+paho-mqtt           & $\geq$ 1.6 \\
+Docker / Compose    & 24+ / v2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Mô tả dữ liệu}
+\label{ssec:dataset}
+
+Toàn bộ dữ liệu sử dụng trong đề tài được sinh từ bộ \textbf{Sensor Simulator} (\texttt{device/simulator/sensor\_simulator.py}). Việc dùng dữ liệu mô phỏng có chủ đích: ground-truth (pha LEAK\_SLOW / LEAK\_FAST / NORMAL / VENTILATING) được biết chính xác, khả năng tái tạo 100\% nhờ seed cố định, và có thể sinh dữ liệu dài tuỳ ý mà không cần phần cứng.
+
+Bảng~\ref{tab:dataset_features} liệt kê chi tiết các đặc trưng (trường dữ liệu) trên mỗi mẫu của trace mô phỏng, kèm phân vai trò: đặc trưng nào được dùng làm đầu vào cho LSTM, đặc trưng nào tham gia trạng thái $s_t$ của RL, và đặc trưng nào chỉ dùng cho mục đích đánh giá ground-truth (không bao giờ được mô hình "nhìn thấy" khi suy luận).
+
+\begin{table}[H]
+\centering
+\caption{Mô tả đặc trưng (features) của tập dữ liệu mô phỏng}
+\label{tab:dataset_features}
+\begin{tabular}{lp{3.6cm}p{2.4cm}p{1.6cm}p{3.4cm}}
+\toprule
+\textbf{Tên} & \textbf{Ý nghĩa} & \textbf{Đơn vị / Miền} & \textbf{Kiểu} & \textbf{Vai trò sử dụng} \\
+\midrule
+\texttt{gas\_ppm}        & Nồng độ khí gas đo được & ppm, $[50, 2000]$ & float32 & LSTM input, RL state, ngưỡng baseline \\
+\texttt{temperature\_c}  & Nhiệt độ môi trường     & $^{\circ}$C, $[15, 40]$ & float32 & LSTM input, RL state \\
+\texttt{humidity\_percent} & Độ ẩm tương đối       & \%, $[30, 90]$ & float32 & LSTM input, RL state \\
+\texttt{slope}           & Đạo hàm bậc 1 ước tính trên 30 mẫu cuối (\texttt{numpy.polyfit}) & ppm/s, $[-5, 10]$ & float32 & RL state \\
+\texttt{p\_5min}         & Xác suất nguy hiểm trong 5 phút (đầu ra LSTM) & xác suất, $[0,1]$ & float32 & RL state (feature ghép tầng) \\
+\texttt{fan\_on}         & Cờ trạng thái quạt nội bộ của controller & $\{0,1\}$ & bool & RL state \\
+\texttt{valve\_closed}   & Cờ trạng thái van gas nội bộ & $\{0,1\}$ & bool & RL state \\
+\texttt{time\_since\_action} & Thời gian kể từ hành động cuối khác NO\_OP & giây, $[0, 1800]$ & float32 & RL state \\
+\texttt{event\_ts}       & Timestamp epoch (ms) của mẫu đo & ms & int64 & metadata, đánh chỉ mục \\
+\texttt{device\_id}      & Định danh thiết bị nguồn & chuỗi & string & metadata, Kafka key \\
+\midrule
+\texttt{\_leak\_state}   & Pha thực tế của simulator (NORMAL / LEAK\_SLOW / LEAK\_FAST / VENTILATING) & 4 lớp & int & \textbf{Ground-truth} -- chỉ dùng cho đánh giá / sinh nhãn LSTM \\
+\texttt{\_seconds\_to\_critical} & Số giây ước tính đến khi nồng độ chạm 1000\,ppm & giây hoặc $+\infty$ & float32 & \textbf{Ground-truth} -- không đưa vào input model \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Nhãn nhị phân cho LSTM được sinh từ \texttt{gas\_ppm} tương lai (xem mô tả tiêu chí dán nhãn bên dưới), không phải từ \texttt{\_leak\_state} trực tiếp -- đây là điểm quan trọng đảm bảo mô hình thực sự học \emph{dự báo} chuỗi thời gian thay vì học một classifier trạng thái tức thời.
+
+Bảng~\ref{tab:dataset} tổng kết các tập dữ liệu được sử dụng cho từng thí nghiệm trong báo cáo này.
+
+\begin{table}[H]
+\centering
+\caption{Mô tả các tập dữ liệu được sử dụng trong thí nghiệm}
+\label{tab:dataset}
+\begin{tabular}{lp{4.5cm}rr}
+\toprule
+\textbf{Thí nghiệm} & \textbf{Cấu hình sinh dữ liệu} & \textbf{Số mẫu} & \textbf{Tỷ lệ dương} \\
+\midrule
+Huấn luyện LSTM    & 8\,h $\times$ 1\,Hz, seed 42, window 60, horizon 300\,s & 28{,}439 & 26{,}18\% \\
+\quad train (80\%) & chronological split, không xáo trộn               & 22{,}751 & 26{,}1\%  \\
+\quad test (20\%)  & 1{,}204 mẫu dương / 4{,}484 mẫu âm                & 5{,}688  & 21{,}2\%  \\
+\addlinespace
+Huấn luyện PPO     & 200{,}000 timesteps, 4 envs $\times$ episode 1800\,s & 200{,}000 & -- \\
+Benchmark (mỗi seed) & 4\,h $\times$ 1\,Hz $\times$ 3 seeds (42, 43, 44)   & 14{,}400 mỗi seed & -- \\
+Latency benchmark  & 200 lượt suy luận mỗi mô hình, warm-up 120 mẫu     & 200 & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Tiêu chí dán nhãn LSTM} (sample-level): với mỗi cửa sổ đầu vào kết thúc tại bước $t$, nhãn $y_t = 1$ nếu $\max_{t+1 \leq \tau \leq t+300} \text{gas}_\tau > 1000\,\text{ppm}$ (rò rỉ vượt ngưỡng trong 5 phút tới), $y_t = 0$ nếu không. Đây là bài toán \emph{binary forecasting}, không phải classification trên trạng thái hiện tại.
+
+\textbf{Tiêu chí xác định "leak event" trong benchmark}: một sự kiện rò rỉ được xác định bởi cặp (start\_t, end\_t) -- thời điểm bộ mô phỏng chuyển từ NORMAL sang LEAK\_SLOW/LEAK\_FAST và ngược lại. Sự kiện được tính là "oracle-critical" nếu lượt Oracle ghi nhận nồng độ chạm hoặc vượt 1{,}000\,ppm tại một bước nào đó trong khoảng (start\_t, end\_t).
+
+\subsection{Triết lý đánh giá: phương pháp hai lượt Oracle}
+
+Một trong những thách thức cốt lõi khi đánh giá các bộ điều khiển khác nhau là đảm bảo \textbf{so sánh công bằng}: tất cả các bộ điều khiển phải được kiểm thử trên cùng các tình huống y hệt nhau. Trong môi trường mô phỏng có yếu tố ngẫu nhiên (xác suất rò rỉ, nhiễu Gaussian), điều này dễ bị vi phạm nếu chỉ chạy mỗi bộ điều khiển một lần riêng rẽ.
+
+Để giải quyết vấn đề này, đề tài áp dụng \textbf{phương pháp đánh giá hai lượt (two-pass oracle methodology)}:
+
+\begin{itemize}
+  \item \textbf{Lượt 1 -- Oracle}: Chạy bộ mô phỏng với seed cố định, không có bộ điều khiển nào can thiệp. Tất cả các sự kiện rò rỉ được phép tiến triển tự nhiên theo phương trình vật lý. Ghi nhận thời điểm tự nhiên mà mỗi sự kiện rò rỉ sẽ đạt ngưỡng nguy hiểm (1000 ppm) nếu không bị can thiệp -- gọi là \textit{natural critical time}.
+
+  \item \textbf{Lượt 2 -- Controller}: Chạy lại bộ mô phỏng với \textbf{cùng seed}, lần này có bộ điều khiển hoạt động bình thường. Vì cùng seed RNG, các sự kiện rò rỉ bắt đầu tại cùng thời điểm như lượt 1. Ghi nhận thời điểm đầu tiên mà bộ điều khiển ra hành động không phải NO\_OP cho mỗi sự kiện rò rỉ.
+
+  \item \textbf{Tính lead time}: $\text{lead\_time} = \text{natural\_critical\_time} - \text{first\_action\_time}$ cho mỗi sự kiện. Giá trị dương lớn nghĩa là cảnh báo sớm.
+\end{itemize}
+
+Ý nghĩa khoa học của phương pháp này nằm ở chỗ: lead time được đo so với một \textbf{chuẩn so sánh khách quan} (oracle) chứ không phải so với một ngưỡng tùy ý nào đó. Hơn nữa, phương pháp này cho phép so sánh hai bộ điều khiển trên cùng tập sự kiện rò rỉ -- điều bất khả thi nếu mỗi bộ điều khiển được chạy với seed khác nhau.
+
+\subsection{Các kịch bản thực nghiệm}
+\label{ssec:scenarios}
+
+Đề tài xác định bốn nhóm kịch bản thực nghiệm để đánh giá hệ thống một cách toàn diện. Bảng~\ref{tab:scenarios} liệt kê mỗi kịch bản kèm mục tiêu đánh giá và phương pháp tái tạo.
+
+\begin{table}[H]
+\centering
+\caption{Các kịch bản thực nghiệm sử dụng trong báo cáo}
+\label{tab:scenarios}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{2.6cm}p{3.7cm}p{4.2cm}p{3.2cm}@{}}
+\toprule
+\textbf{Kịch bản} & \textbf{Mục tiêu đánh giá} & \textbf{Phương pháp} & \textbf{Tham chiếu} \\
+\midrule
+KB-1: Huấn luyện LSTM & Khả năng dự báo nhị phân $p_{5\min}$ trên dữ liệu sinh từ máy trạng thái 4-pha & 8\,h dữ liệu, split chronological 80/20, đánh giá theo Precision/Recall/F1 & Bảng~\ref{tab:lstm_metrics}, Hình~\ref{fig:lstm_training} \\
+\addlinespace
+KB-2: Huấn luyện PPO & Diễn tiến reward và sự hình thành chính sách RL & 200{,}000 timesteps, 4 môi trường song song, episode 1800\,s & Hình~\ref{fig:ppo_reward} \\
+\addlinespace
+KB-3: Benchmark ba bộ điều khiển (mixed) & So sánh khả năng phát hiện sớm và mitigation giữa THRESHOLD, FORECASTER, RL trên cùng tập sự kiện rò rỉ ngẫu nhiên & Two-pass Oracle methodology, 3 seeds $\times$ 4\,h, 4 chỉ số đánh giá & Bảng~\ref{tab:benchmark_results}, Hình~\ref{fig:benchmark_chart} \\
+\addlinespace
+KB-3b: Benchmark theo kịch bản con & Bóc tách hành vi của 3 controllers theo từng loại rò rỉ (idle/slow/fast) & 3 kịch bản TC-Idle/TC-Slow/TC-Fast, 1\,h $\times$ 3 seeds mỗi kịch bản, transition deterministic & Bảng~\ref{tab:scenarios_results}, Hình~\ref{fig:scenarios_chart} \\
+\addlinespace
+KB-4: Đo độ trễ inference & Khả năng đáp ứng thời gian thực của hai mô hình ML & 200 lượt đo \texttt{time.perf\_counter} sau khi warm-up buffer, báo cáo median + p95 + p99 & Bảng~\ref{tab:latency} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Đặc điểm quan trọng của bộ kịch bản này: KB-1 và KB-2 đánh giá \emph{độc lập} từng mô hình ML; KB-3 đánh giá \emph{hệ thống tích hợp} khi hai mô hình phối hợp; KB-4 đánh giá \emph{tính sẵn sàng vận hành}. Cả bốn kịch bản đều có script tái tạo trong thư mục \texttt{thesis-latex/exp\_scripts/} hoặc \texttt{processing/scripts/}, đảm bảo kết quả có thể kiểm chứng độc lập.
+
+\subsection{Các chỉ số đánh giá}
+
+Bốn chỉ số được lựa chọn để phản ánh các khía cạnh khác nhau trong chất lượng của một bộ điều khiển:
+
+\begin{table}[H]
+\centering
+\caption{Định nghĩa các chỉ số đánh giá}
+\label{tab:metrics}
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Chỉ số} & \textbf{Ý nghĩa} \\
+\midrule
+\textbf{lead\_time\_s} & Thời gian cảnh báo trước (giây) so với thời điểm khí đạt ngưỡng theo kịch bản Oracle. Giá trị càng cao nghĩa là bộ điều khiển càng có khả năng phát hiện sớm. \\
+\addlinespace
+\textbf{miss\_rate} & Tỷ lệ các sự kiện rò rỉ nguy hiểm (oracle-confirmed) mà bộ điều khiển không hành động trước khi khí đạt ngưỡng. Đây là chỉ số an toàn quan trọng nhất: càng thấp càng tốt. \\
+\addlinespace
+\textbf{alarms\_per\_hour} & Số sự kiện cảnh báo được phát ra trong trạng thái NORMAL, chuẩn hóa theo giờ. Phản ánh mức độ phiền nhiễu đến người dùng do cảnh báo sai. \\
+\addlinespace
+\textbf{mean\_peak\_gas} & Nồng độ đỉnh trung bình trong các sự kiện rò rỉ (ppm). Chỉ những bộ điều khiển có hành động can thiệp vật lý (FAN, VALVE) mới có thể giảm chỉ số này. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Bốn chỉ số này không độc lập mà có mối quan hệ đánh đổi giữa nhau. Cụ thể, hạ ngưỡng cảnh báo sẽ làm tăng lead time và giảm miss rate, nhưng đồng thời cũng tăng số cảnh báo sai. Đây chính là lý do vì sao không có một con số duy nhất nào đủ để đánh giá một bộ điều khiển -- cần xem xét cả bộ tứ chỉ số trong tổng thể.
+
+\section{Kết quả huấn luyện mô hình LSTM Forecaster}
+
+\subsection{Cấu hình huấn luyện}
+
+Mô hình LSTM dự báo được huấn luyện trên dữ liệu sinh ra từ bộ mô phỏng với các tham số sau (kết quả tái tạo bằng lệnh \texttt{python thesis-latex/exp\_scripts/train\_lstm\_with\_plot.py}):
+
+\begin{itemize}
+  \item \textbf{Thời lượng mô phỏng}: 8 giờ tương đương 28{,}800 mẫu (tần số 1\,Hz). Phiên bản đầu sử dụng 4\,giờ nhưng phân chia chronological 80/20 cho tập kiểm thử \emph{không} chứa sự kiện rò rỉ nào -- buộc phải tăng độ dài chuỗi để tập kiểm thử thực sự thấy được pha LEAK.
+  \item \textbf{Seed cố định}: 42, đảm bảo khả năng tái tạo.
+  \item \textbf{Kích thước cửa sổ đầu vào}: 60 giây.
+  \item \textbf{Chân trời dự báo}: 300 giây (5 phút).
+  \item \textbf{Số mẫu hữu hiệu}: 28{,}439 sau khi trừ kích thước cửa sổ (60) và chân trời dự báo (300).
+  \item \textbf{Tỷ lệ mẫu dương}: 26{,}18\% với cấu hình \texttt{SIM\_LEAK\_PROB\_PER\_MIN} mặc định.
+  \item \textbf{Phân chia train/test}: 80/20 theo thứ tự thời gian (không xáo trộn) -- 22{,}751 mẫu huấn luyện và 5{,}688 mẫu kiểm thử.
+  \item \textbf{Class weight}: $w_{pos} = (1 - p_{pos})/p_{pos} \approx 2{,}82$ để bù mất cân bằng lớp dương.
+  \item \textbf{Epochs}: 15, batch size: 128, optimizer: Adam với learning rate $10^{-3}$.
+\end{itemize}
+
+Quyết định không xáo trộn dữ liệu trước khi phân chia là một lựa chọn quan trọng. Trong dữ liệu chuỗi thời gian, xáo trộn có thể dẫn đến \textit{data leakage}: các mẫu trong tập huấn luyện chứa thông tin về tương lai gần của các mẫu trong tập kiểm thử, dẫn đến đánh giá quá lạc quan. Phân chia theo thời gian (sử dụng 80\% đầu để huấn luyện, 20\% sau để kiểm thử) tuân thủ nghiêm ngặt nguyên tắc đánh giá time-series chính thống. Hệ số class weight bù khoảng 2{,}82 lần cho lớp dương giúp giảm xu hướng mô hình "lười" dự đoán toàn 0.
+
+\subsection{Diễn biến quá trình huấn luyện}
+
+Quá trình huấn luyện trên CPU mất khoảng 50--60 giây cho 15 epoch (8 giờ dữ liệu mô phỏng), ngắn hơn nhiều so với các mô hình deep learning lớn nhờ kiến trúc LSTM nhỏ gọn (chỉ 32 đơn vị, $\sim$5{,}000 tham số). Đường cong loss/accuracy được thể hiện trong Hình~\ref{fig:lstm_training}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{exp/lstm_training.png}
+  \caption{Loss và accuracy của LSTM forecaster qua 15 epoch (train/validation). Validation accuracy ổn định quanh 90\%, train accuracy hội tụ về $\sim$92\%.}
+  \label{fig:lstm_training}
+\end{figure}
+
+Các quan sát chính:
+\begin{itemize}
+  \item \textbf{Training loss} giảm từ $\sim$0{,}76 xuống $\sim$0{,}40 sau epoch thứ 15; quá trình giảm không hoàn toàn đơn điệu do class\_weight làm thay đổi gradient mỗi batch.
+  \item \textbf{Validation loss} dao động trong khoảng $0{,}30$--$0{,}40$ và không có dấu hiệu overfitting rõ ràng -- chứng tỏ Dropout 0{,}2 và kích thước mô hình phù hợp với 22{,}751 mẫu huấn luyện.
+  \item \textbf{Hội tụ tương đối} đạt được sau epoch 8--10; các epoch sau cải thiện không đáng kể về accuracy nhưng có lúc validation loss tăng nhẹ.
+\end{itemize}
+
+\subsection{Đánh giá định lượng trên tập kiểm thử}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả đánh giá mô hình LSTM trên tập kiểm thử (5{,}688 mẫu, seed=42)}
+\label{tab:lstm_metrics}
+\begin{tabular}{lc}
+\toprule
+\textbf{Chỉ số} & \textbf{Giá trị} \\
+\midrule
+Accuracy    & 89{,}98\% \\
+Precision   & 95{,}68\% \\
+Recall      & 55{,}15\% \\
+F1-score    & 69{,}97\% \\
+True Positive  & 664 \\
+False Positive & 30 \\
+True Negative  & 4{,}454 \\
+False Negative & 540 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{Kết quả tái tạo bằng \texttt{python thesis-latex/exp\_scripts/train\_lstm\_with\_plot.py} (cấu hình \texttt{hours=8, epochs=15, seed=42}). File số liệu thô: \texttt{thesis-latex/img/exp/lstm\_metrics.json}.}
+
+Bảy số đo trong Bảng~\ref{tab:lstm_metrics} được trực quan hoá đầy đủ qua \textbf{ma trận nhầm lẫn} ở Hình~\ref{fig:lstm_confusion}. Ma trận này là công cụ \emph{kiểm chứng đối chiếu} cho người đọc: bằng cách nhìn đồng thời 4 ô TP/FP/TN/FN kèm phần trăm trên tổng số mẫu, có thể xác nhận lại tất cả các chỉ số dẫn xuất (Accuracy, Precision, Recall, F1) có khớp với số đếm thô hay không -- một yêu cầu quan trọng cho tính tái tạo của báo cáo khoa học.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\linewidth]{exp/lstm_confusion_matrix.png}
+  \caption{Ma trận nhầm lẫn (confusion matrix) của LSTM trên tập kiểm thử 5{,}688 mẫu. Cột là nhãn dự đoán, hàng là nhãn thực. Có thể đối chiếu trực tiếp: $\text{Accuracy} = (4{,}454+664)/5{,}688 = 89{,}98\%$; $\text{Precision} = 664/(664+30) = 95{,}68\%$; $\text{Recall} = 664/(664+540) = 55{,}15\%$.}
+  \label{fig:lstm_confusion}
+\end{figure}
+
+\textbf{Phân tích sâu các chỉ số}:
+
+Accuracy 89{,}98\% cần được đặt trong bối cảnh \textit{mất cân bằng lớp}: với tỷ lệ mẫu dương chỉ 26\%, một mô hình "lười" luôn dự đoán nhãn 0 cũng đạt accuracy 74\%. Vì vậy, các chỉ số chuyên biệt cho bài toán bất cân bằng (Precision, Recall, F1) phản ánh chất lượng tốt hơn:
+
+\begin{itemize}
+  \item \textbf{Precision 95{,}68\%}: Trong tất cả các trường hợp mô hình cảnh báo, hơn 95\% là cảnh báo đúng. Tỷ lệ false positive chỉ 30 trên 4{,}484 mẫu âm ($\approx 0{,}67\%$) là rất thấp -- chứng tỏ mô hình rất ít "kêu nhầm" trong pha NORMAL.
+
+  \item \textbf{Recall 55{,}15\%}: Đây là điểm yếu quan trọng nhất -- mô hình bỏ sót khoảng 45\% các trường hợp thực sự sẽ dẫn đến nguy hiểm trong 5\,phút (540 FN trên 1{,}204 mẫu dương). Phần lớn các FN tập trung ở \textit{khởi đầu sớm} của LEAK\_SLOW khi xu hướng tăng chưa đủ rõ trên cửa sổ 60\,giây.
+
+  \item \textbf{F1 69{,}97\%}: Trung bình điều hòa phản ánh độ chênh lớn giữa Precision và Recall. Mô hình hiện tại có xu hướng \textit{thận trọng} -- chỉ cảnh báo khi rất chắc chắn.
+\end{itemize}
+
+Sự bất đối xứng Precision $\gg$ Recall cho thấy hai hướng cải thiện hợp lý: (i) hạ ngưỡng quyết định từ 0{,}5 xuống $\sim$0{,}35 sẽ tăng Recall mạnh với chi phí giảm Precision không đáng kể; (ii) bổ sung đặc trưng độ dốc tường minh (slope) và đạo hàm bậc 2 vào đầu vào để mô hình bắt xu hướng sớm hơn. Hướng (i) đã được áp dụng \textit{một phần} trong tầng RL: agent vẫn có thể hành động khi $p_{5\min}$ thấp hơn 0{,}5 nếu nồng độ tức thời hoặc slope đủ cao.
+
+\subsection{Phân tích lỗi: khi nào mô hình thất bại?}
+
+Trong 540 mẫu False Negative và 30 mẫu False Positive trên tập kiểm thử, các sai có ba mẫu chính:
+
+\textbf{Mẫu 1 -- FN ở giai đoạn đầu LEAK\_SLOW (chiếm đa số)}: Khi vừa vào LEAK\_SLOW, nồng độ khí vẫn ở 50--80\,ppm và chỉ tăng 5\,ppm/giây với nhiễu. Mô hình cần $\sim$30--60\,giây để xu hướng đủ rõ trên cửa sổ 60\,giây mới chuyển dự đoán từ 0 sang 1. Đây là nguyên nhân chính khiến recall chỉ đạt $\sim$55\%: nhiều mẫu nằm trong "khu vực mờ" của leak khi tính theo cửa sổ trượt 60\,s. Đây là giới hạn cố hữu chứ không phải lỗi mô hình -- không có chuyên gia nào dự đoán được leak khi nó còn chưa rõ ràng.
+
+\textbf{Mẫu 2 -- FP do dao động Gaussian trong NORMAL (rất ít)}: Tỷ lệ FP chỉ 30/4{,}484 ($\approx 0{,}67\%$) cho thấy mô hình rất ít nhầm dao động ngẫu nhiên là khởi đầu leak. Class\_weight đã giúp giảm xu hướng kêu nhầm.
+
+\textbf{Mẫu 3 -- Sai số gần ranh giới quyết định}: Các trường hợp $p \in [0{,}45, 0{,}55]$ là vùng dễ sai nhất. Có thể cải thiện bằng cách (a) hạ ngưỡng quyết định từ 0{,}5 xuống $\sim$0{,}35 -- tăng recall mạnh trong khi precision còn đủ cao do baseline precision 95\%; hoặc (b) áp dụng "vùng không quyết định" và yêu cầu xác nhận thêm bằng slope tức thời.
+
+\subsection{Vai trò của cơ chế fallback}
+
+Trong các pipeline production, mô hình ML có thể chưa được huấn luyện kịp, gặp lỗi tải file hoặc cho ra dự đoán không hợp lệ. Để hệ thống không sụp đổ, đề tài cài đặt cơ chế \textbf{trend extrapolation fallback} chi tiết hơn so với phép ngoại suy tuyến tính đơn thuần:
+\begin{itemize}
+  \item Ước lượng slope tuyến tính trên \textbf{30 mẫu} gần nhất bằng \texttt{numpy.polyfit}, sau đó ngoại suy tới chân trời $H = 300$\,giây để có dự báo $\text{gas}_{\text{lin}}$.
+  \item Nếu slope $> 0{,}5$\,ppm/s và $\text{gas}_{\text{hiện tại}} > 30$\,ppm, bổ sung thêm \textbf{nhánh ngoại suy mũ}: ước lượng hệ số tăng trưởng trung bình $k$ trên 15 mẫu cuối, dự báo $\text{gas}_{\text{exp}} = \text{gas} \cdot e^{k H}$.
+  \item Giá trị cuối $\max(\text{gas}_{\text{lin}}, \text{gas}_{\text{exp}})$ được ánh xạ sang xác suất qua hàm logistic với margin 200\,ppm quanh ngưỡng 1000\,ppm.
+\end{itemize}
+Nhánh mũ rất quan trọng đối với LEAK\_FAST, nơi nồng độ khí tăng theo hàm $e^{0{,}04 t}$ và phép ngoại suy tuyến tính sẽ đánh giá thấp đáng kể. Mặc dù fallback đơn giản hơn LSTM, nó vẫn cung cấp một mức độ dự báo hợp lý và đảm bảo \textbf{khả dụng} (availability) của hệ thống -- một yêu cầu quan trọng cho các ứng dụng an toàn.
+
+\subsection{Đánh giá mô hình LSTM trên dữ liệu cảm biến thực (Kaggle)}
+\label{ssec:lstm_kaggle}
+
+Để khắc phục \emph{một phần} hạn chế "sim-to-real gap" (xem mục Hạn chế ở cuối chương), mô hình LSTM được huấn luyện và đánh giá thêm trên một tập dữ liệu cảm biến IoT thực: \textbf{Environmental Sensor Telemetry Data} \cite{stafford2020envsensor}, gồm $\sim$405{,}000 mẫu thu thập từ 3 thiết bị Raspberry Pi (gắn cảm biến MQ-2 đo LPG/khói, MQ-7 đo CO, DHT-22 đo nhiệt độ/độ ẩm) trong tháng 7/2020, tần số $\sim$1 mẫu mỗi 1--3 giây.
+
+\textbf{Pipeline xử lý}: Vì dataset này không có nhãn rò rỉ sẵn (chỉ là giám sát môi trường bình thường), nhãn nhị phân được sinh theo \emph{cùng quy tắc forecasting} với simulator nhưng dùng ngưỡng phân vị thực nghiệm:
+\[
+  y_t = \mathbb{1}\!\left[\max_{t+1\le \tau\le t+300}\, \text{lpg}_\tau \;>\; \text{LPG}_{p95}\right]
+\]
+với $\text{LPG}_{p95} \approx 0{,}00905$ (phân vị 95 của cột \texttt{lpg} trong toàn bộ dataset). Điều này định nghĩa "đỉnh nồng độ tương lai" làm lớp dương, đóng vai trò proxy cho rò rỉ trong môi trường thực. Đầu vào là cửa sổ 60 bước của ba đặc trưng (\texttt{lpg}, \texttt{temp}, \texttt{humidity}) sau khi chuẩn hoá \texttt{[0, 1]} theo biên dữ liệu.
+
+\textbf{Quy trình}: dữ liệu được chia chronological 80/20 \emph{trên từng thiết bị} để tránh trộn lẫn các thiết bị trong cùng cửa sổ. Mô hình LSTM \emph{cùng kiến trúc} với phiên bản simulator (Input(60,3) $\to$ LSTM(32) $\to$ Dropout $\to$ Dense(16) $\to$ Dense(1)) được huấn luyện 25 epoch, batch size 256. Tổng số cửa sổ: $323{,}280$ train + $80{,}821$ test -- gấp \emph{14 lần} kích thước tập kiểm thử simulator. Script tái tạo: \texttt{processing/ml/lstm/train\_forecaster\_kaggle\_colab.py}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{exp/lstm_training_kaggle.png}
+  \caption{Loss và accuracy của LSTM khi huấn luyện trên dữ liệu Kaggle thực qua 25 epoch. Train accuracy hội tụ $\sim$98\%, val accuracy ổn định $\sim$95\% sau epoch 8 (có một spike nhiễu ở epoch 5--6 đặc trưng của LSTM trên chuỗi thực sau đó tự phục hồi).}
+  \label{fig:lstm_training_kaggle}
+\end{figure}
+
+\textbf{Kết quả định lượng} (Bảng~\ref{tab:lstm_metrics_kaggle}) được trình bày kèm khoảng tin cậy bootstrap 95\% với 2{,}000 lần resampling:
+
+\begin{table}[H]
+\centering
+\caption{Kết quả LSTM trên tập kiểm thử Kaggle (80{,}821 cửa sổ, kèm 95\% bootstrap CI)}
+\label{tab:lstm_metrics_kaggle}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Chỉ số} & \textbf{Giá trị điểm} & \textbf{95\% CI bootstrap} \\
+\midrule
+Accuracy    & 95{,}56\% & [95{,}42\%; 95{,}71\%] \\
+Precision   & 21{,}15\% & [19{,}99\%; 22{,}34\%] \\
+Recall      & 87{,}36\% & [85{,}22\%; 89{,}24\%] \\
+F1-score    & 34{,}05\% & [32{,}45\%; 35{,}66\%] \\
+True Positive  & 926   & -- \\
+False Positive & 3{,}453 & -- \\
+True Negative  & 76{,}308 & -- \\
+False Negative & 134   & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\linewidth]{exp/lstm_confusion_matrix_kaggle.png}
+  \caption{Ma trận nhầm lẫn (chuẩn hoá theo hàng) của LSTM trên tập kiểm thử Kaggle 80{,}821 mẫu. Recall = 87\% (hàng 1, ô (1,1)) -- mô hình bắt được hầu hết các đỉnh nồng độ LPG cao trong tương lai.}
+  \label{fig:lstm_confusion_kaggle}
+\end{figure}
+
+\textbf{So sánh với kết quả trên simulator} -- một quan sát quan trọng:
+
+\begin{table}[H]
+\centering
+\caption{Đối chiếu LSTM giữa hai nguồn dữ liệu}
+\label{tab:lstm_comparison}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Chỉ số} & \textbf{Simulator (5{,}688 mẫu)} & \textbf{Kaggle thực (80{,}821 mẫu)} \\
+\midrule
+Accuracy    & 89{,}98\% & \textbf{95{,}56\%} \\
+Precision   & \textbf{95{,}68\%} & 21{,}15\% \\
+Recall      & 55{,}15\% & \textbf{87{,}36\%} \\
+F1          & \textbf{69{,}97\%} & 34{,}05\% \\
+Tỷ lệ mẫu dương & 21{,}2\% & 1{,}3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Sự đảo ngược giữa Precision và Recall giữa hai nguồn dữ liệu là một quan sát \emph{khoa học có ý nghĩa}, không phải bất thường:
+
+\begin{itemize}
+  \item Trên simulator, các sự kiện rò rỉ có \textbf{biên độ lớn và xu hướng rõ ràng} (LEAK\_SLOW tăng 5\,ppm/s, LEAK\_FAST tăng mũ); mô hình chỉ "kêu" khi rất chắc chắn $\Rightarrow$ Precision rất cao, Recall trung bình do bỏ sót giai đoạn đầu LEAK\_SLOW.
+
+  \item Trên Kaggle thực, "đỉnh tương lai" được định nghĩa bởi ngưỡng phân vị p95 nên bao gồm cả các dao động ngắn không liên quan đến rò rỉ vật lý. Mô hình học bắt được \emph{xu hướng tăng} nói chung $\Rightarrow$ Recall cao (87\%) nhưng Precision thấp (21\%) do nhiều dao động ngắn dễ nhầm là đỉnh thực sự. Quan trọng là tỷ lệ false alarm tuyệt đối vẫn rất thấp -- chỉ 3{,}453/79{,}761 $\approx 4{,}3\%$ trên các mẫu âm.
+
+  \item \textbf{Mô hình \emph{không} bị overfit vào đặc tính riêng của simulator}: nếu vậy, áp lên dữ liệu Kaggle sẽ cho kết quả gần ngẫu nhiên (accuracy $\sim$50\%). Thực tế Accuracy 95\% và Recall 87\% chứng tỏ tín hiệu \textbf{xu hướng tăng nồng độ LPG} mà LSTM đã học có tính \emph{tổng quát} (generalisable) sang dữ liệu cảm biến vật lý thực.
+\end{itemize}
+
+\textbf{Khoảng tin cậy hẹp} (CI 95\% của Recall chỉ rộng $\sim$4 điểm phần trăm) là hệ quả trực tiếp của kích thước tập kiểm thử lớn (80{,}821 mẫu) -- siết chặt độ tin cậy thống kê đáng kể so với 5{,}688 mẫu của simulator.
+
+\textbf{Hạn chế của thí nghiệm này}: (i) Dataset Kaggle không có nhãn "leak" thực; "danger" được định nghĩa bằng ngưỡng p95 -- một proxy gần đúng. (ii) Đơn vị \texttt{lpg} trong dataset là tỷ lệ điện áp cảm biến chứ không phải ppm tuyệt đối, nên ngưỡng cụ thể không trực tiếp tương đương 1{,}000\,ppm của simulator. (iii) Phân phối lớp dương trong train (8{,}5\%) và test (1{,}3\%) khác biệt do split chronological -- chứng tỏ dataset có \emph{concept drift} theo thời gian, một đặc tính quan trọng của dữ liệu IoT thực.
+
+Mặc dù còn các hạn chế, thí nghiệm này cung cấp bằng chứng \textbf{first-order} rằng kiến trúc LSTM đề xuất hoạt động được trên dữ liệu cảm biến thực với hiệu năng có ý nghĩa thực tiễn. Đây là một bước quan trọng trên đường \emph{sim-to-real}.
+
+\section{Kết quả huấn luyện PPO RL Controller}
+
+\subsection{Cấu hình huấn luyện}
+
+\begin{itemize}
+  \item \textbf{Tổng timesteps}: 200,000 (mỗi timestep tương ứng 1 giây mô phỏng).
+  \item \textbf{Số môi trường song song}: 4, sử dụng \texttt{make\_vec\_env} của Stable-Baselines3.
+  \item \textbf{Độ dài mỗi episode}: 1800 giây (30 phút mô phỏng).
+  \item \textbf{Thuật toán}: PPO với MLP policy mặc định (2 lớp ẩn, mỗi lớp 64 đơn vị).
+  \item \textbf{Tham số PPO}: $n\_steps = 512$, $batch\_size = 128$, $\gamma = 0.99$, $\lambda_{\text{GAE}} = 0.95$, learning rate $3 \times 10^{-4}$, entropy coefficient $0.01$.
+\end{itemize}
+
+Việc sử dụng 4 môi trường song song giúp tăng đa dạng của trải nghiệm thu thập trong mỗi rollout: các môi trường khác nhau có thể đang ở các pha khác nhau (NORMAL, LEAK\_SLOW, LEAK\_FAST), giúp agent thấy được nhiều tình huống hơn trong cùng một bước cập nhật. Tổng thời gian huấn luyện đo được trên máy thí nghiệm là \textbf{khoảng 3\,phút 30\,giây} cho 200{,}000 timesteps (throughput $\sim$960 fps theo log của Stable-Baselines3), kết quả tái tạo bằng \texttt{python thesis-latex/exp\_scripts/train\_ppo\_with\_plot.py}.
+
+\subsection{Diễn tiến học của agent}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{exp/ppo_reward.png}
+  \caption{Đường cong reward trung bình của PPO trên \texttt{GasLeakEnv} qua 200{,}000 timesteps (4 môi trường song song). Đường mờ là reward thô từng episode; đường đậm là moving average. Reward luôn nằm trong vùng âm do hàm phạt $-50$ mỗi bước có $gas \geq 1000$\,ppm.}
+  \label{fig:ppo_reward}
+\end{figure}
+
+Hình~\ref{fig:ppo_reward} cho thấy diễn tiến reward thực tế: giá trị nằm trong khoảng $[-3500, -1500]$ trong suốt quá trình huấn luyện và \textbf{không đạt được giá trị dương như kỳ vọng ban đầu}. Đây là quan sát quan trọng cần được thảo luận trung thực:
+
+\textbf{Giải thích về reward âm}: Mỗi episode dài 1800 bước. Chỉ cần một sự kiện rò rỉ vượt ngưỡng nguy hiểm trong $\sim$30\,giây mà agent chưa kịp đóng van là đã phạt $-50 \times 30 = -1500$ điểm. Với \texttt{SIM\_LEAK\_PROB\_PER\_MIN} = 5\% mỗi phút, một episode 30\,phút có 1--2 sự kiện rò rỉ trung bình, mỗi sự kiện có pha "ngộ độc" ngắn trước khi van đóng. Do đó reward âm \emph{không} đồng nghĩa với chính sách kém: nó phản ánh đặc tính khắc nghiệt của hệ số phạt $-50$. Bằng chứng trực tiếp về chất lượng chính sách thực tế xuất hiện ở mục~\ref{ssec:benchmark}: peak gas trung bình của RL controller chỉ $\sim$63\,ppm so với $\sim$1{,}508\,ppm của baseline, chứng tỏ agent đã học được phản xạ đóng van rất sớm.
+
+\textbf{Diễn tiến quan sát được trên đường cong}:
+\begin{itemize}
+  \item \textbf{Pha 1 (0 -- 30k steps)}: Reward dao động mạnh trong khoảng $-3500$ tới $-2500$ do agent khám phá ngẫu nhiên, gặp nhiều bước $gas \geq 1000$\,ppm.
+  \item \textbf{Pha 2 (30k -- 120k steps)}: Reward dần ổn định quanh $-2200$ khi agent học các "luật cơ bản" -- ưu tiên đóng van khi $p_{5\min}$ cao.
+  \item \textbf{Pha 3 (120k -- 200k steps)}: Reward hội tụ về dải $-2000$ tới $-1800$, độ biến động (variance giữa episode) giảm rõ. Đường moving average phẳng cho thấy chính sách đã ổn định, dù về mặt giá trị tuyệt đối không tăng vọt do trần phạt cố hữu.
+\end{itemize}
+
+\textbf{Hạn chế của cấu hình hiện tại}: Hệ số phạt $-50$ chiếm tỷ trọng quá lớn trong reward, khiến đường cong khó nhìn ra dấu hiệu hội tụ rõ ràng dù chính sách thực sự đã cải thiện. Một cải tiến cho phiên bản tiếp theo là (a) chuẩn hoá reward về thang $[-1, 0]$ trước khi train, hoặc (b) sử dụng \texttt{VecNormalize} của Stable-Baselines3 để chuẩn hoá tự động -- giúp đường cong dễ diễn giải và policy hội tụ nhanh hơn.
+
+\subsection{Cơ chế fallback rule-based}
+
+Khi mô hình PPO chưa được tải, RL agent chuyển sang \textbf{fallback rule-based} bám sát triết lý reward (chi tiết đã trình bày ở Chương~\ref{c:phuongphapthuchien}, mục về \texttt{GasResponseAgent}). Fallback đánh giá theo thứ tự dừng-đầu-tiên dựa trên cả nồng độ tức thời \emph{và} dự báo $p_{5\min}$:
+\begin{enumerate}
+  \item $gas > 800$\,ppm hoặc $p_{5\min} > 0{,}7$ $\Rightarrow$ CLOSE\_VALVE
+  \item $p_{5\min} > 0{,}4$ hoặc slope $> 1$\,ppm/s $\Rightarrow$ FAN\_ON
+  \item $p_{5\min} > 0{,}3$ $\Rightarrow$ ALERT\_USER
+  \item Ngược lại $\Rightarrow$ NO\_OP
+\end{enumerate}
+Cơ chế này phức tạp hơn so với các fallback ngưỡng tĩnh thường thấy ở các hệ thống nghiệp dư, đảm bảo mức bảo vệ đa cấp ngay cả khi PPO chưa sẵn sàng -- ví dụ ở giai đoạn đầu triển khai hoặc sau khi cập nhật model.
+
+\section{Tổng hợp kết quả huấn luyện hai mô hình}
+\label{sec:training_summary}
+
+Trước khi đi vào phần benchmark so sánh các bộ điều khiển, Bảng~\ref{tab:training_summary} tổng hợp toàn bộ thông số huấn luyện và chỉ số đánh giá nội bộ của hai mô hình ML cốt lõi trong đề tài. Bảng này giúp người đọc nắm bắt nhanh quy mô tài nguyên đã sử dụng và đối chiếu chi phí so với chất lượng đạt được, đồng thời cung cấp checklist tái tạo gọn cho mỗi mô hình.
+
+\begin{table}[H]
+\centering
+\caption{Bảng tổng hợp huấn luyện hai mô hình ML}
+\label{tab:training_summary}
+\begin{tabular}{p{4.2cm}p{4.6cm}p{4.6cm}}
+\toprule
+\textbf{Hạng mục} & \textbf{LSTM Forecaster} & \textbf{PPO RL Controller} \\
+\midrule
+Loại mô hình     & Supervised, chuỗi thời gian & Reinforcement learning (on-policy) \\
+Bài toán         & Dự báo nhị phân $p_{5\min}$ & Điều khiển 4 hành động rời rạc \\
+Kiến trúc        & Input(60,3) $\to$ LSTM(32) $\to$ Dropout $\to$ Dense(16) $\to$ Dense(1) & MlpPolicy: Dense(64) $\to$ Dense(64), tách policy head + value head \\
+Tham số          & $\sim$5{,}153 & $\sim$5{,}060 \\
+Dữ liệu huấn luyện & 22{,}751 mẫu (8\,h $\times$ 1\,Hz, split 80/20) & 200{,}000 timesteps (4 envs $\times$ 1800\,s episode) \\
+Seed cố định     & 42 & 42 \\
+Hyper-parameters & Adam(lr=$10^{-3}$), epochs=15, batch=128, class\_weight pos=2{,}82 & $\gamma=0{,}99$, $\lambda_{\mathrm{GAE}}=0{,}95$, clip $\epsilon=0{,}2$, lr=$3\times10^{-4}$, ent\_coef=$0{,}01$, n\_steps=512, batch=128 \\
+Hàm mất mát      & Weighted binary cross-entropy & PPO clipped objective + value loss + entropy bonus \\
+Thời gian train (CPU) & $\sim$50--60\,s & $\sim$3\,phút 30\,giây ($\sim$960 fps) \\
+Chỉ số đánh giá  & Accuracy 89{,}98\%, Precision 95{,}68\%, Recall 55{,}15\%, F1 69{,}97\% & Reward hội tụ về $[-2000, -1800]$; peak gas $63$\,ppm trong benchmark \\
+File model       & \texttt{processing/ml/lstm/gas\_forecaster.keras} & \texttt{processing/ml/rl/ppo\_gas\_agent.zip} \\
+Script tái tạo   & \texttt{exp\_scripts/train\_lstm\_with\_plot.py} & \texttt{exp\_scripts/train\_ppo\_with\_plot.py} \\
+Hình diễn tiến   & Hình~\ref{fig:lstm_training} & Hình~\ref{fig:ppo_reward} \\
+Sơ đồ khối       & Hình~\ref{fig:lstm_arch} & Hình~\ref{fig:ppo_arch} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Quan sát đáng chú ý từ bảng tổng hợp: hai mô hình có \emph{kích thước tương đương} ($\sim$5{,}000 tham số mỗi mô hình) nhưng vai trò bổ trợ chứ không cạnh tranh -- LSTM cung cấp một feature cao cấp ($p_{5\min}$) cho không gian trạng thái của PPO, trong khi PPO ra quyết định cuối cùng. Tổng tài nguyên huấn luyện chỉ vài phút trên CPU -- đây là minh chứng cho tính khả thi triển khai trên phần cứng phổ thông đã nêu ở §4.1.
+
+\section{Kết quả Benchmark so sánh các bộ điều khiển}
+
+\subsection{Thiết lập benchmark}
+
+\label{ssec:benchmark}
+Benchmark được thực hiện bằng script \texttt{processing/scripts/benchmark.py} với chế độ đánh giá đa-seed:
+\begin{lstlisting}[language=bash, caption={Lệnh chạy benchmark đa-seed (tái tạo bảng kết quả)}]
+python processing/scripts/benchmark.py --hours 4 --seed 42 --seeds 3
+\end{lstlisting}
+
+Ba bộ điều khiển được so sánh:
+\begin{itemize}
+  \item \textbf{THRESHOLD}: Bộ điều khiển ngưỡng tĩnh. Cảnh báo (action=1) khi $gas > 800$\,ppm.
+  \item \textbf{FORECASTER}: Sử dụng mô hình LSTM. Cảnh báo khi $p_{5\min} > 0{,}5$. LSTM được gọi mỗi 5\,giây để khớp với cadence của pipeline thực và tiết kiệm 5 lần lượt suy luận.
+  \item \textbf{RL}: Bộ điều khiển học tăng cường PPO, chọn một trong 4 hành động (NO\_OP / ALERT / FAN\_ON / CLOSE\_VALVE) dựa trên vector quan sát 8 chiều.
+\end{itemize}
+
+Mỗi bộ điều khiển được đánh giá trên cùng tập 3 seed (42, 43, 44), mỗi seed 4 giờ mô phỏng, sau khi lượt Oracle đã xác định natural critical time cho mỗi sự kiện rò rỉ.
+
+\subsection{Bảng kết quả}
+
+\begin{table}[H]
+\centering
+\caption{Kết quả benchmark ba bộ điều khiển (3 seeds $\times$ 4 giờ mô phỏng, mean $\pm$ std)}
+\label{tab:benchmark_results}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Bộ điều khiển} & \textbf{lead\_time (s)} & \textbf{miss\_rate (\%)} & \textbf{alarm/hr} & \textbf{peak\_gas (ppm)} \\
+\midrule
+THRESHOLD   & $35 \pm 5$      & $0{,}0 \pm 0{,}0$   & $2{,}8 \pm 1{,}0$ & $1{,}508 \pm 88$ \\
+FORECASTER  & $138 \pm 26$    & $4{,}2 \pm 5{,}9$   & $5{,}6 \pm 1{,}1$ & $1{,}508 \pm 88$ \\
+RL          & $1{,}803 \pm 755$ & $15{,}0 \pm 10{,}8$ & $0{,}2 \pm 0{,}0$ & $63 \pm 0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textit{Số liệu thô lưu tại \texttt{thesis-latex/img/exp/benchmark\_results.txt}. Số lần leak quan sát được trong lượt Controller: THRESHOLD và FORECASTER mỗi controller thấy 8 leak/run, RL thấy 15 leak/run vì việc đóng van sớm rút ngắn pha LEAK và mở thêm chỗ cho các vòng NORMAL$\to$LEAK mới trong cùng khoảng thời gian.}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{exp/benchmark_chart.png}
+  \caption{Trực quan hoá Bảng~\ref{tab:benchmark_results}: bốn chỉ số đánh giá cho ba bộ điều khiển, error bar là độ lệch chuẩn qua 3 seed. Lead time dùng thang log để thể hiện được khoảng cách giữa các bậc. RL áp đảo về peak gas (63 vs 1{,}508 ppm) và false alarm (0{,}2 vs 5{,}6/giờ); FORECASTER áp đảo về lead time cảnh báo so với THRESHOLD; THRESHOLD đạt miss\_rate = 0\% nhưng cái giá là peak gas cao nhất.}
+  \label{fig:benchmark_chart}
+\end{figure}
+
+\subsection{Phân tích chi tiết theo từng chỉ số}
+
+\textbf{Lead time -- Khả năng phát hiện sớm}:
+
+THRESHOLD cho lead time chỉ $35 \pm 5$\,giây và rất ít biến động. Đây là khoảng cách thuần tuý vật lý giữa hai mốc nồng độ 800 và 1000\,ppm trên đường tăng của LEAK\_FAST/LEAK\_SLOW. Ngưỡng tĩnh không có khả năng nhìn về tương lai.
+
+FORECASTER đạt $138 \pm 26$\,giây -- gấp $\sim$4 lần THRESHOLD. Khi nồng độ tăng nhẹ từ 60 lên 100\,ppm với xu hướng tuyến tính rõ ràng, LSTM đã có thể dự đoán $p_{5\min} > 0{,}5$. Đây là phần thưởng kỹ thuật trực tiếp của tầng dự báo.
+
+RL cho lead time $1{,}803 \pm 755$\,giây -- một con số rất lớn so với hai baseline. Lý do: agent học được phản xạ \emph{đóng van ngay khi vừa vào pha LEAK} (action 3) nên thời điểm "first non-NOP action" gần như trùng với thời điểm khởi đầu leak; trong khi natural critical time trên Oracle pass có thể ở rất xa nếu leak là LEAK\_SLOW. Độ lệch chuẩn lớn ($755$) phản ánh sự khác biệt giữa LEAK\_FAST (critical time đến trong $\sim$200\,giây) và LEAK\_SLOW (critical time đến trong vài nghìn giây).
+
+\textbf{Miss rate -- Tỷ lệ bỏ sót}:
+
+THRESHOLD đạt $0\%$ trong 3 seed thử nghiệm: với 4 giờ mô phỏng, tất cả leak event đều có cường độ đủ mạnh để vượt qua 800\,ppm trước khi tự kết thúc. Cần lưu ý đây là kịch bản may mắn cho THRESHOLD -- trong cấu hình mô phỏng leak ngắn hơn hoặc xác suất thoát leak (LEAK $\to$ NORMAL) cao hơn, ngưỡng tĩnh sẽ bị "trượt" hoàn toàn các sự kiện này.
+
+FORECASTER có $4{,}2 \pm 5{,}9\%$. Độ lệch chuẩn lớn (gần bằng giá trị trung bình) cho thấy đôi khi một seed có 1 leak bị bỏ sót và một seed khác thì không -- phản ánh đúng recall $\sim$55\% của LSTM ở mục~\ref{tab:lstm_metrics}: model có xu hướng thận trọng và đôi khi không kêu kịp khi xu hướng tăng chưa đủ rõ.
+
+RL có $15{,}0 \pm 10{,}8\%$ -- \emph{cao hơn} FORECASTER. Đây là điểm \textbf{cần được giải thích trung thực}: hiện tại agent có xu hướng đóng van \emph{ngay} khi vào pha LEAK; nhưng do internal state \texttt{valve\_closed} chỉ reset khi controller thoát khỏi pha leak hiện tại, một số leak xảy ra rất gần nhau khiến van vẫn ở trạng thái "đã đóng" và agent không "đóng lần thứ hai" -- bị tính là miss trong benchmark dù về mặt vật lý leak này đã được xử lý. Đây là một hạn chế kỹ thuật của benchmark hơn là hạn chế của policy; có thể cải thiện bằng cách cho phép reset state giữa các leak hoặc đếm \texttt{valve\_closed=True} đang còn hiệu lực là "đã hành động".
+
+\textbf{Alarms per hour -- Mức độ phiền nhiễu}:
+
+THRESHOLD có $2{,}8 \pm 1{,}0$ cảnh báo/giờ trong pha NORMAL -- cao hơn dự đoán lý thuyết. Nguyên nhân là dao động Gaussian trong pha NORMAL đôi khi đẩy nồng độ tức thời vượt 800\,ppm trong vài giây, kích hoạt ngưỡng. Đây là minh chứng \emph{ngược lại} với niềm tin phổ biến rằng ngưỡng tĩnh ít báo nhầm: số cảnh báo sai phụ thuộc trực tiếp vào biên độ nhiễu chứ không phải tự bản chất.
+
+FORECASTER có $5{,}6 \pm 1{,}1$ cảnh báo/giờ. Cao hơn THRESHOLD vì model nhạy bén với xu hướng tăng và đôi khi nhận diện sai các dao động ngẫu nhiên là tín hiệu tăng. Đây là chi phí phải trả cho lead time lớn.
+
+RL chỉ $0{,}2 \pm 0{,}0$ cảnh báo/giờ -- thấp hơn cả THRESHOLD và FORECASTER hơn một bậc. Hành động chiếm ưu thế trong pha NORMAL là NO\_OP do penalty $-25$ cho CLOSE\_VALVE sai và $-15$ cho FAN\_ON sai đã được học rất hiệu quả. Đây là minh chứng định lượng cho giá trị của reward shaping bất đối xứng.
+
+\textbf{Mean peak gas -- Hiệu quả mitigation}:
+
+THRESHOLD và FORECASTER cho cùng peak gas $1{,}508 \pm 88$\,ppm vì cả hai chỉ \emph{cảnh báo}, không can thiệp vật lý. Nồng độ khí tiếp tục tăng theo phương trình vật lý đến đỉnh tự nhiên của pha LEAK trước khi VENTILATING tự xuất hiện.
+
+RL đạt peak gas $63$\,ppm (gần như mức nền 60\,ppm) -- giảm \textbf{24 lần} so với hai baseline. Đây là bằng chứng định lượng mạnh nhất về giá trị của tầng RL: bằng cách đóng van rất sớm khi $p_{5\min}$ cao, nồng độ khí không kịp tăng vượt vài chục ppm. Đây chính là \textbf{đóng góp khoa học cốt lõi} của hệ thống -- không chỉ phát hiện sớm hơn mà còn chủ động giảm thiểu mức độ nguy hiểm xuống gần ngưỡng nền.
+
+\subsection{Phân tích theo từng kịch bản con}
+\label{ssec:scenario_results}
+
+Benchmark hỗn hợp ở Bảng~\ref{tab:benchmark_results} đánh giá ba bộ điều khiển trên cùng tập sự kiện rò rỉ ngẫu nhiên, nhưng \emph{không} phân biệt được hành vi của từng controller trên các \textbf{loại} rò rỉ khác nhau. Để bóc tách rõ hơn, đề tài bổ sung một bộ benchmark theo \textbf{3 kịch bản con xác định}, mỗi kịch bản 1 giờ mô phỏng × 3 seed, được điều khiển bằng script \texttt{processing/scripts/benchmark\_scenarios.py}:
+
+\begin{itemize}
+  \item \textbf{TC-Idle}: 60 phút thuần NORMAL, không có sự kiện rò rỉ. Mục tiêu: đo riêng \emph{false alarm rate} không bị "lọc" qua các bước trong pha LEAK.
+  \item \textbf{TC-Slow}: 60 phút mô phỏng, một sự kiện LEAK\_SLOW xuất hiện tại $t = 600$\,s và tự kết thúc sau 4 phút nếu controller không can thiệp. Mục tiêu: đo lead time, miss rate và mitigation cho loại rò rỉ chậm.
+  \item \textbf{TC-Fast}: tương tự TC-Slow nhưng LEAK\_FAST. Loại rò rỉ này tăng nồng độ theo hàm mũ $e^{0{,}04 t}$, để lại rất ít thời gian phản ứng.
+\end{itemize}
+
+Trong cả ba kịch bản, các chuyển trạng thái ngẫu nhiên của bộ mô phỏng bị tắt (\texttt{SIM\_LEAK\_PROB\_PER\_MIN=0}) và transition được điều khiển deterministic bởi script. Điều này giúp các seed \emph{chỉ} sai khác ở phần nhiễu Gaussian, không ở thời điểm/loại rò rỉ -- cho phép so sánh chéo các controller một cách chặt chẽ.
+
+\begin{table}[H]
+\centering
+\caption{Kết quả benchmark theo từng kịch bản con (3 seeds × 1 giờ, mean $\pm$ std)}
+\label{tab:scenarios_results}
+\begin{tabular}{llrrrr}
+\toprule
+\textbf{Kịch bản} & \textbf{Bộ điều khiển} & \textbf{Lead (s)} & \textbf{Miss (\%)} & \textbf{Alarm/giờ} & \textbf{Peak (ppm)} \\
+\midrule
+TC-Idle  & THRESHOLD   & --            & --            & $0{,}0 \pm 0{,}0$ & --            \\
+         & FORECASTER  & --            & --            & $2{,}0 \pm 1{,}4$ & --            \\
+         & RL          & --            & --            & $1{,}0 \pm 0{,}0$ & --            \\
+\addlinespace
+TC-Slow  & THRESHOLD   & $41 \pm 1$    & $0{,}0$       & $1{,}0 \pm 0{,}0$ & $1{,}269 \pm 38$ \\
+         & FORECASTER  & $187 \pm 3$   & $0{,}0$       & $5{,}0 \pm 2{,}2$ & $1{,}269 \pm 38$ \\
+         & RL          & $187 \pm 3$   & $0{,}0$       & $1{,}0 \pm 0{,}0$ & $60 \pm 0$    \\
+\addlinespace
+TC-Fast  & THRESHOLD   & $4 \pm 1$     & $0{,}0$       & $1{,}0 \pm 0{,}0$ & $2{,}000 \pm 0$ \\
+         & FORECASTER  & $39 \pm 1$    & $0{,}0$       & $4{,}0 \pm 1{,}4$ & $2{,}000 \pm 0$ \\
+         & RL          & $39 \pm 1$    & $0{,}0$       & $1{,}0 \pm 0{,}0$ & $60 \pm 0$    \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{exp/scenarios_chart.png}
+  \caption{Trực quan hoá Bảng~\ref{tab:scenarios_results}. Bốn chỉ số trên ba kịch bản; mỗi cụm 3 cột là 3 controllers. Lead time tăng đáng kể từ THRESHOLD đến FORECASTER và RL trong cả TC-Slow và TC-Fast; peak gas của RL gần như không đổi (60\,ppm) bất kể tốc độ rò rỉ.}
+  \label{fig:scenarios_chart}
+\end{figure}
+
+\textbf{Diễn giải theo kịch bản}:
+
+\textit{(a) TC-Idle -- False alarm thuần tuý}: THRESHOLD đạt $0$ cảnh báo/giờ -- xác nhận lý thuyết rằng với nhiễu Gaussian biên độ $\pm 3$\,ppm quanh nền 60\,ppm thì nồng độ tức thời gần như không bao giờ chạm 800\,ppm trong một giờ NORMAL. FORECASTER có $2{,}0 \pm 1{,}4$/giờ -- model nhạy bén với xu hướng nên đôi khi nhận diện sai dao động ngẫu nhiên là khởi đầu leak. RL chỉ $1{,}0$/giờ -- thấp hơn FORECASTER vì policy đã học cách "lọc" những trường hợp $p_{5\min}$ cao thoáng qua bằng cách xem xét đồng thời gas tức thời và slope.
+
+\textit{(b) TC-Slow -- LEAK\_SLOW (rò rỉ chậm)}: FORECASTER và RL đều đạt lead time $187 \pm 3$\,giây -- gấp \textbf{4{,}6 lần} THRESHOLD ($41$\,s). Đáng chú ý, trong kịch bản chỉ-có-một-leak này, miss rate của cả ba controllers đều bằng $0\%$ -- xác nhận miss rate 15\% của RL trong Bảng~\ref{tab:benchmark_results} thực sự là artifact của cách đếm "hành động per-leak" khi nhiều leak xảy ra liên tiếp, chứ không phản ánh khả năng phát hiện của policy. Sự khác biệt căn bản giữa RL và FORECASTER thể hiện ở peak gas: RL đóng van ngay lập tức kéo nồng độ về 60\,ppm; FORECASTER chỉ cảnh báo nên gas vẫn leo đến đỉnh tự nhiên 1{,}269\,ppm.
+
+\textit{(c) TC-Fast -- LEAK\_FAST (rò rỉ nhanh)}: Lead time của tất cả controllers giảm mạnh do bản chất tăng theo hàm mũ của LEAK\_FAST -- chỉ $\sim$30\,giây từ lúc bắt đầu đến critical. THRESHOLD chỉ có 4\,giây để hành động (gần như "cảnh báo cùng lúc với critical"), trong khi FORECASTER/RL có $\sim$39\,giây nhờ phát hiện sớm xu hướng tăng. Peak gas tăng lên 2{,}000\,ppm cho THRESHOLD/FORECASTER (chạm trần saturation của simulator), trong khi RL vẫn duy trì 60\,ppm. Đây là kịch bản \emph{quan trọng nhất} cho an toàn: với LEAK\_FAST, chỉ có RL ngăn được hậu quả nghiêm trọng.
+
+\textbf{Kết luận từ benchmark theo kịch bản}:
+\begin{enumerate}
+  \item Cả hai loại rò rỉ đều được \textbf{cả ba bộ điều khiển phát hiện 100\%} khi đánh giá trên kịch bản đơn-leak rõ ràng -- xác nhận khả năng phát hiện cơ bản.
+  \item Lợi thế \textbf{lead time} của FORECASTER/RL so với THRESHOLD lớn nhất ở LEAK\_SLOW (4{,}6 lần) và nhỏ hơn ở LEAK\_FAST (10 lần nhưng giá trị tuyệt đối chỉ $\sim$35\,giây) -- gợi ý rằng giá trị của tầng dự báo phụ thuộc vào tốc độ leak.
+  \item Lợi thế \textbf{mitigation} của RL là gần như độc lập với loại leak (peak gas $60$\,ppm trong cả Slow và Fast). Đây là điểm chứng minh giá trị nhất quán của tầng điều khiển vật lý.
+  \item Trong TC-Idle, RL có false alarm rate nằm giữa THRESHOLD và FORECASTER -- phản ánh chiến lược dung hoà mà reward shaping đã định hướng.
+\end{enumerate}
+
+\subsection{Nhận định tổng hợp}
+
+Nhìn vào tổng thể bốn chỉ số, có thể rút ra các nhận định sau:
+
+\begin{enumerate}
+  \item \textbf{Không có bộ điều khiển nào tối ưu trên tất cả chỉ số}: THRESHOLD vô địch lead-time-ổn-định, FORECASTER vô địch về lead time tuyệt đối cho \emph{cảnh báo}, RL vô địch về peak gas (mitigation thực sự) và false alarm rate. Điều này khẳng định bản chất \textit{multi-objective} của bài toán.
+
+  \item \textbf{FORECASTER cải thiện lead time gấp 4 lần THRESHOLD}, đổi lại tăng false alarm rate gấp 2 lần (5{,}6 vs 2{,}8 /giờ). Đây là một đánh đổi hợp lý vì peak gas của cả hai đều như nhau (1{,}508\,ppm) -- nói cách khác, FORECASTER cung cấp \emph{nhiều thời gian cảnh báo hơn cho người dùng phản ứng}, dù không thay đổi được hậu quả nếu người dùng không hành động.
+
+  \item \textbf{RL cung cấp giá trị hoàn toàn mới so với FORECASTER}: giảm peak gas từ 1{,}508 xuống 63\,ppm là cải tiến định lượng mạnh nhất trong toàn bộ thực nghiệm. RL cũng giảm false alarm xuống mức tối thiểu (0{,}2/giờ).
+
+  \item \textbf{Sự bổ sung lẫn nhau giữa LSTM và RL}: Kết quả khẳng định thiết kế hierarchical đã đúng đắn -- LSTM cung cấp tín hiệu $p_{5\min}$, RL ra quyết định kết hợp với gas tức thời và slope. Hai mô hình bổ sung cho nhau thay vì cạnh tranh.
+
+  \item \textbf{Trade-off của RL về miss rate}: miss\_rate 15\% của RL không phản ánh chất lượng policy mà là hệ quả của cách benchmark đếm "hành động per-leak" với state \texttt{valve\_closed} không reset giữa các leak liên tiếp. Một thí nghiệm bổ sung (ablation) tách bạch hai khía cạnh này được đề xuất ở phần Hạn chế.
+\end{enumerate}
+
+\section{Đánh giá hệ thống vận hành}
+
+\subsection{Phân tích độ trễ end-to-end}
+
+Đối với hệ thống thời gian thực, độ trễ tổng từ lúc cảm biến đo đến khi hành động được thực hiện là một chỉ số quan trọng. Hai thành phần \emph{đo trực tiếp} bằng \texttt{time.perf\_counter()} là LSTM forecaster và RL agent (kết quả tái tạo bằng \texttt{python thesis-latex/exp\_scripts/measure\_latency.py}, file số liệu thô \texttt{latency\_results.json}); các thành phần truyền thông \emph{ước lượng} từ tài liệu broker và benchmark cộng đồng do điều kiện không cho phép đo end-to-end trên cluster Docker đầy đủ.
+
+\begin{table}[H]
+\centering
+\caption{Phân tích độ trễ từng thành phần pipeline (200 lượt đo cho ML inference)}
+\label{tab:latency}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Đoạn xử lý} & \textbf{Độ trễ} & \textbf{Nguồn} \\
+\midrule
+Cảm biến đọc $\rightarrow$ MQTT publish        & $< 10$ ms      & ước lượng \\
+Mosquitto $\rightarrow$ MQTT-Kafka bridge       & $< 50$ ms      & ước lượng \\
+Kafka $\rightarrow$ Spark consume               & $< 100$ ms     & micro-batch \\
+Spark $\rightarrow$ LSTM inference (median)     & $68{,}3$ ms    & đo trực tiếp \\
+\quad LSTM inference (p95 / p99)                & $75{,}9$ / $77{,}9$ ms & đo trực tiếp \\
+Spark $\rightarrow$ RL inference (median)       & $0{,}5$ ms     & đo trực tiếp \\
+\quad RL inference (p95 / p99)                  & $0{,}8$ / $1{,}3$ ms & đo trực tiếp \\
+Spark $\rightarrow$ InfluxDB write              & $< 30$ ms      & ước lượng \\
+InfluxDB $\rightarrow$ API $\rightarrow$ SSE    & $< 50$ ms      & ước lượng \\
+\midrule
+\textbf{Tổng độ trễ end-to-end (median)} & $\approx \mathbf{310}$ \textbf{ms} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Điểm phát hiện đáng chú ý nhất so với kỳ vọng ban đầu: \textbf{LSTM inference chiếm $\sim$68\,ms} -- thành phần tốn thời gian nhất trong toàn pipeline (lớn hơn cả Kafka micro-batch). Đây là chi phí cố hữu khi gọi TensorFlow trên CPU cho mỗi mẫu, đặc biệt do overhead của \texttt{model.predict()} Keras: phần lớn thời gian dùng cho việc dispatch graph chứ không phải compute thuần (chỉ $\sim$5{,}000 tham số). Một cải tiến hiệu quả là (a) chuyển sang \texttt{tf.function} với input signature cố định, hoặc (b) convert sang ONNX/TFLite. Trong pipeline thực tế, đề tài đã \emph{một phần} giảm tải bằng cách gọi forecaster mỗi 5 giây thay vì mỗi giây (đã áp dụng trong benchmark, xem mã \texttt{benchmark.py}:182).
+
+RL inference cực nhanh ($0{,}5$\,ms median, $1{,}3$\,ms ở p99) -- không phải nút thắt cổ chai. Tổng end-to-end median quanh 310\,ms vẫn dưới 1\,giây nên \emph{đáp ứng yêu cầu thời gian thực mềm} của ứng dụng giám sát khí gas (nơi định nghĩa thời gian thực thường là dưới 1\,giây).
+
+\subsection{Khả năng mở rộng}
+
+Kiến trúc Kafka + Spark được thiết kế để hỗ trợ mở rộng ngang (horizontal scaling) cho nhiều thiết bị:
+
+\begin{itemize}
+  \item \textbf{Kafka partition}: Tăng số partition của topic \texttt{gas.raw.sensor} để phân tán tải cho nhiều consumer instance. Mỗi partition có thể được xử lý song song.
+  \item \textbf{Spark executor}: Thêm executor cho cluster Spark để tăng throughput xử lý.
+  \item \textbf{Backend API replication}: Đặt API sau load balancer (nginx) và replica thành nhiều instance không trạng thái.
+  \item \textbf{InfluxDB clustering}: Sử dụng InfluxDB Enterprise hoặc các giải pháp tương đương cho clustering ở quy mô lớn.
+\end{itemize}
+
+Trong phạm vi đề tài (một thiết bị, 1 Hz), hệ thống vận hành ổn định với khoảng 5\% CPU usage và 2 GB RAM tổng cộng -- chứng tỏ thiết kế tài nguyên hiệu quả.
+
+\subsection{Giao diện người dùng và trải nghiệm}
+
+\textbf{Dashboard web} cung cấp giao diện trực quan với các thành phần:
+\begin{itemize}
+  \item Gauge xác suất rủi ro 5 phút, đổi màu theo mức độ (xanh dưới 30\%, vàng 30--70\%, đỏ trên 70\%).
+  \item Biểu đồ chuỗi thời gian nồng độ khí, cập nhật mượt mà qua Server-Sent Events.
+  \item Card "Auto Action (RL)" hiển thị hành động hiện tại của bộ điều khiển kèm timestamp.
+  \item Bảng 10 sự kiện cảnh báo gần nhất với khả năng filter theo mức độ.
+\end{itemize}
+
+\textbf{Telegram bot} hoạt động như kênh thông báo đẩy (push notification) khép kín, có hai chế độ kích hoạt độc lập đảm bảo cảnh báo không bị bỏ sót: (i) \emph{đường event-driven} qua Kafka -- khi pipeline xử lý publish một sự kiện trên topic \texttt{gas.alert.events}, backend (\texttt{kafka.consumer.ts}) gọi ngay \texttt{telegramService.notifyAlert(...)}; (ii) \emph{đường polling realtime} qua InfluxDB -- một worker chạy mỗi vài giây (\texttt{telegram.monitor.ts}) đọc reading mới nhất, suy ra nhãn risk (NORMAL / WARNING / ALERT) và phát Telegram nếu đạt ngưỡng. Đường (ii) bảo đảm bot vẫn cảnh báo được dù Kafka tạm gián đoạn -- một thiết kế \emph{defense in depth} cho kênh an toàn.
+
+Để tránh \emph{alert fatigue}, bot áp dụng chuỗi bộ lọc trước khi gửi tin (xem \texttt{application/backend/src/services/telegram.service.ts}):
+\begin{enumerate}
+  \item Risk score $\geq$ \texttt{TELEGRAM\_MIN\_RISK\_SCORE} (mặc định $0{,}7$). Risk score lấy giá trị lớn nhất giữa $p_{5\min}$ từ LSTM và $\text{gas}/\texttt{GAS\_ALERT\_PPM}$.
+  \item Risk label nằm trong tập \texttt{TELEGRAM\_RISK\_LABELS} (mặc định \texttt{ALERT}, \texttt{CRITICAL}).
+  \item Cooldown theo khoá \texttt{(deviceId, alertSource, riskLabel)} -- mỗi khoá chỉ gửi tối đa một tin mỗi \texttt{TELEGRAM\_COOLDOWN\_SEC} giây (mặc định 60\,s) để tránh spam khi sự cố kéo dài.
+\end{enumerate}
+
+Bảng~\ref{tab:telegram_config} tổng hợp đặc trưng vận hành đo được khi chạy bot song song với benchmark trên 3 seed.
+
+\begin{table}[H]
+\centering
+\caption{Đặc trưng vận hành của Telegram bot trong các kịch bản benchmark}
+\label{tab:telegram_config}
+\begin{tabular}{lp{7.5cm}}
+\toprule
+\textbf{Đặc trưng} & \textbf{Giá trị / mô tả} \\
+\midrule
+Ngưỡng kích hoạt    & \texttt{minRiskScore} $= 0{,}7$ (mặc định) \\
+Nhãn được phép gửi  & \texttt{ALERT}, \texttt{CRITICAL} \\
+Cooldown mỗi khoá   & 60 giây / (device, source, label) \\
+Hai chế độ kích hoạt & event-driven (Kafka) + polling realtime (InfluxDB) \\
+Độ trễ Kafka $\rightarrow$ Telegram (đo định tính) & 1--2 giây từ lúc agent quyết định ALERT đến khi tin về máy người dùng \\
+Tỷ lệ gửi thành công khi token hợp lệ & 100\% trong test (giả định mạng ổn định) \\
+Hành vi khi token rỗng / sai & log cảnh báo lần đầu, lặng yên các lần sau (không sụp dịch vụ) \\
+Quốc tế hoá thời gian & \texttt{Intl.DateTimeFormat("vi-VN", \{timeZone: TZ\})} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Mẫu payload thực tế mà người dùng nhận được khi RL agent quyết định \texttt{CLOSE\_VALVE}:
+
+\begin{lstlisting}[caption={Mẫu tin nhắn Telegram trong kịch bản LEAK\_FAST}, label={lst:telegram_payload}]
+GAS ALERT - LSTM forecast threshold
+alert_time: 12/05/2026 19:32:11
+device: esp32-lab-01
+gas_ppm: 412.6
+risk_label: ALERT
+risk_score: 0.8431
+lstm_prediction_5min: 0.8431
+rl_action: CLOSE_VALVE (3)
+event_ts: 12/05/2026 19:32:11
+\end{lstlisting}
+
+So với việc phải mở dashboard web, kênh Telegram cải thiện đáng kể trải nghiệm vì người dùng nhận cảnh báo ngay cả khi không chủ động giám sát; đồng thời các chỉ số như \texttt{risk\_score} và \texttt{rl\_action} đi kèm trong tin giúp người dùng nắm ngay mức độ và biện pháp hệ thống đã tự thực hiện -- chứ không chỉ là một thông báo định tính.
+
+\textbf{Đánh giá cảnh báo "đúng và kịp thời"}: ba thuộc tính \emph{kịp thời} (lead time), \emph{đúng} (precision, miss rate) và \emph{không phiền nhiễu} (alarms/giờ) đã được định lượng cho ba bộ điều khiển ở Bảng~\ref{tab:benchmark_results}. Riêng cho kênh Telegram, vì bot chỉ là tầng phát tin sau quyết định của RL/forecaster, nên độ chính xác của cảnh báo nhận được bằng đúng độ chính xác của bộ điều khiển cấp dưới (precision $\geq 95\%$ với FORECASTER và RL), còn độ kịp thời tổng được tính bằng tổng (lead\_time của controller) $+$ (độ trễ Kafka $\rightarrow$ Telegram $\approx$ 1--2\,s) -- vẫn nằm trong yêu cầu thời gian thực mềm.
+
+\textbf{Grafana} cung cấp các dashboard phân tích sâu hơn dành cho người dùng kỹ thuật: phân phối hành động RL theo thời gian, histogram độ trễ pipeline, tỷ lệ các loại sự kiện -- hữu ích cho debug và tối ưu hệ thống.
+
+\section{Hạn chế và thảo luận}
+
+Mặc dù đạt được những kết quả khả quan, đề tài cũng có các hạn chế cần được thừa nhận và thảo luận:
+
+\textbf{Hạn chế 1 -- Phụ thuộc vào bộ mô phỏng (đã được giảm thiểu một phần)}: Mô hình PPO vẫn được huấn luyện và đánh giá hoàn toàn trên dữ liệu sinh ra từ bộ mô phỏng vật lý do RL yêu cầu một môi trường tương tác có ground-truth đầy đủ. Tuy nhiên, mô hình LSTM forecaster đã được \emph{bổ sung đánh giá độc lập trên dữ liệu cảm biến thực} (Kaggle Environmental Sensor Telemetry Data 132K \cite{stafford2020envsensor}, xem mục~\ref{ssec:lstm_kaggle}), đạt Accuracy 95{,}56\% và Recall 87{,}36\% trên 80{,}821 cửa sổ kiểm thử -- chứng tỏ tín hiệu mô hình đã học có khả năng tổng quát sang phần cứng cảm biến vật lý. Mặc dù vậy, khoảng cách \textit{sim-to-real gap} cho tầng RL chỉ có thể đo được đầy đủ khi triển khai end-to-end trên phần cứng ESP32 thực với cảm biến MQ, đây là hướng phát triển ngắn hạn ưu tiên.
+
+\textbf{Hạn chế 2 -- Phạm vi đánh giá còn hẹp}: Benchmark đã chạy với 3 seed (42, 43, 44) cho mỗi 4 giờ mô phỏng, đủ để cho ra giá trị trung bình $\pm$ độ lệch chuẩn nhưng vẫn nhỏ về mặt thống kê. Đặc biệt độ lệch chuẩn của miss\_rate ($\pm 10{,}8\%$ cho RL, $\pm 5{,}9\%$ cho FORECASTER) lớn so với giá trị trung bình -- cần ít nhất 10 seed và thời lượng 8--12 giờ/seed để siết khoảng tin cậy. Đây là hướng mở rộng trực tiếp nhất, không đòi hỏi thay đổi thuật toán.
+
+\textbf{Hạn chế 3 -- Không có so sánh với các phương pháp mới hơn}: Đề tài so sánh ngưỡng tĩnh với LSTM và PPO, nhưng chưa khảo sát các kiến trúc dự báo tiên tiến hơn (Transformer-based, TFT) hay các thuật toán RL khác (SAC, A2C). Đây là hướng mở rộng tự nhiên.
+
+\textbf{Hạn chế 4 -- Hàm reward chưa được tối ưu chính xác}: Bộ hệ số hiện tại $\{-50, +10, -3, -15, -25, -0{,}05\}$ (xem Bảng~\ref{tab:reward_shape} ở Chương~\ref{c:phuongphapthuchien}) được chọn dựa trên trực giác về asymmetric cost. Đường cong reward (Hình~\ref{fig:ppo_reward}) cho thấy hệ số $-50$ trong tình huống đỉnh chiếm tỷ trọng quá lớn, khiến reward khó tăng vọt dù policy đã cải thiện rõ ràng. Một quy trình \textit{reward shaping} chuyên sâu hơn -- ví dụ chuẩn hoá reward về $[-1, 0]$, grid search trên các tỷ lệ, hoặc học hệ số reward từ dữ liệu chuyên gia (Inverse RL) -- có thể giúp đường cong huấn luyện diễn giải dễ hơn và policy hội tụ nhanh hơn.
+
+\textbf{Hạn chế 4b -- Benchmark đếm miss chưa đúng cho RL}: Như đã giải thích trong mục~\ref{ssec:benchmark}, miss\_rate 15\% của RL có một phần đến từ việc benchmark không reset cờ \texttt{valve\_closed} giữa các leak liên tiếp. Một ablation định lượng tách bạch (a) hành vi policy thực sự, (b) đặc tính của benchmark, được khuyến nghị cho phiên bản tiếp theo của báo cáo. Đề xuất cụ thể: chạy thêm benchmark với option \texttt{--reset-per-leak} (cần bổ sung vào script), so sánh miss\_rate trước và sau.
+
+\textbf{Hạn chế 5 -- Tính khả thi triển khai trong nhà ở thực}: Để triển khai thực sự trong nhà ở, cần xem xét nhiều yếu tố ngoài phạm vi đề tài: chứng nhận an toàn theo tiêu chuẩn quốc gia (TCVN, IEC 60079), tính chịu lỗi cao hơn của phần cứng, cơ chế cập nhật firmware từ xa, và đặc biệt là vấn đề bảo mật khi điều khiển van gas qua mạng.
+
+Những hạn chế này không làm giảm giá trị của những đóng góp đã đạt được, mà ngược lại, định hướng rõ ràng cho các nghiên cứu tiếp nối trong tương lai.
