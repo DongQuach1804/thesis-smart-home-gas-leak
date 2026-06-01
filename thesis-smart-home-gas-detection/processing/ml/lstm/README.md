@@ -6,7 +6,7 @@ Pre-trained Keras LSTM model for gas leak risk prediction.
 
 - **Filename:** `best_lstm_uci.keras`
 - **Format:** Keras native (`.keras`) — compatible with TensorFlow ≥ 2.12 / Keras 3+
-- **Trained on:** UCI HAR / gas sensor dataset
+- **Trained on**: UCI Gas Sensor Array Under Dynamic Gas Mixtures
 
 ## Model Input / Output
 
