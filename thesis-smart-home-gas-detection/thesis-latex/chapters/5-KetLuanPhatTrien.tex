@@ -11,15 +11,15 @@ Khóa luận này đã trình bày việc thiết kế, triển khai và đánh 
 \begin{enumerate}
   \item \textbf{Bộ mô phỏng vật lý trạng thái có thể tái tạo}: Thay thế generator ngẫu nhiên đơn giản bằng máy trạng thái vật lý (NORMAL → LEAK\_SLOW/FAST → VENTILATING) với các phương trình động lực học thực tế. Bộ mô phỏng phát nhãn ground-truth để huấn luyện và đánh giá mô hình, đồng thời có thể tái tạo hoàn toàn thông qua RNG seed.
 
-  \item \textbf{Mô hình LSTM dự báo tiên tiến}: Chuyển từ bài toán phân loại trạng thái hiện tại sang bài toán dự báo xác suất rủi ro trong 5 phút tới. Mô hình huấn luyện trên dữ liệu tổng hợp từ bộ mô phỏng và cung cấp cảnh báo sớm trước khi khí đạt ngưỡng nguy hiểm. Cơ chế fallback trend extrapolation đảm bảo hệ thống hoạt động ngay cả khi chưa có mô hình được huấn luyện.
+  \item \textbf{Mô hình LSTM dự báo tiên tiến}: Chuyển từ bài toán phân loại trạng thái hiện tại sang bài toán dự báo xác suất rủi ro trong 5 phút tới. Mô hình huấn luyện trên dữ liệu tổng hợp từ bộ mô phỏng và \emph{được kiểm chứng độc lập trên dữ liệu cảm biến thực} (Kaggle 132K, Accuracy 96{,}4\%, Recall 92{,}8\%), chứng tỏ tín hiệu học được tổng quát sang phần cứng thực. Cơ chế fallback trend extrapolation đảm bảo hệ thống hoạt động ngay cả khi chưa có mô hình được huấn luyện.
 
-  \item \textbf{Bộ điều khiển PPO học tăng cường}: Học chính sách tối ưu trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với khả năng lựa chọn hành động đa dạng (NO\_OP/ALERT/FAN/VALVE). Kết quả benchmark cho thấy RL controller giảm peak gas đáng kể so với bộ điều khiển ngưỡng, nhờ có khả năng kích hoạt biện pháp can thiệp vật lý.
+  \item \textbf{Bộ điều khiển PPO học tăng cường}: Học chính sách tối ưu trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với khả năng lựa chọn hành động đa dạng (NO\_OP/ALERT/FAN/VALVE). Với hàm reward \textit{outcome-based} (thưởng theo kết quả kiềm chế khí, đã loại bỏ reward hacking của phiên bản đầu), bộ điều khiển RL \textbf{vượt trội trên cả ba chỉ số kết quả} so với cả baseline tĩnh lẫn một luật tay tinh chỉnh thủ công: tỷ lệ bỏ sót 5\% (luật tay 27\%, ngưỡng tĩnh 96\%), nồng độ đỉnh trung bình 222\,ppm (baseline 1{,}508\,ppm), và số cảnh báo sai thấp nhất (1{,}1/giờ). Điều quan trọng là RL đạt được điều này \emph{không} cần con người đặt ngưỡng thủ công -- chính sách được học hoàn toàn tự động từ tương tác với môi trường.
 
-  \item \textbf{Pipeline streaming hiện đại}: Kiến trúc MQTT → Kafka → Spark cho phép xử lý dữ liệu cảm biến gần thời gian thực với độ trễ end-to-end dưới 300 ms, có khả năng mở rộng ngang cho nhiều thiết bị.
+  \item \textbf{Pipeline streaming hiện đại}: Kiến trúc MQTT → Kafka → Spark cho phép xử lý dữ liệu cảm biến gần thời gian thực với độ trễ end-to-end dưới 350 ms, có khả năng mở rộng ngang cho nhiều thiết bị.
 
   \item \textbf{Tích hợp Telegram chatbot}: Cung cấp kênh cảnh báo đẩy và điều khiển từ xa không cần cài ứng dụng riêng, tăng tiếp cận với người dùng thông thường.
 
-  \item \textbf{Phương pháp đánh giá hai lượt (oracle + controller)}: Cung cấp phương pháp so sánh công bằng và tái tạo được giữa các bộ điều khiển, dựa trên các chỉ số có ý nghĩa thực tiễn (lead time, miss rate, peak gas).
+  \item \textbf{Phương pháp đánh giá công bằng}: Định nghĩa \texttt{miss} theo \emph{kết quả} (khí có thực sự chạm 1000\,ppm hay không) -- công bằng cho mọi controller kể cả loại làm thay đổi quỹ đạo vật lý; đo lead time bằng kịch bản đơn-leak xác định để so sánh hợp lệ. Bổ sung baseline luật tay (\texttt{RULE}) để kiểm chứng nghiêm khắc giá trị thực sự của RL. Các chỉ số đều có ý nghĩa thực tiễn (lead time, miss rate, peak gas, false alarm).
 
   \item \textbf{Triển khai Docker Compose hoàn chỉnh}: Toàn bộ hệ thống 10 service có thể khởi động bằng một lệnh duy nhất, đảm bảo khả năng tái tạo và đơn giản hóa quá trình demo và kiểm tra.
 \end{enumerate}
@@ -32,6 +32,8 @@ Khóa luận này đã trình bày việc thiết kế, triển khai và đánh 
   \item \textbf{Fallback mechanism quan trọng cho hệ thống thực}: Mô hình ML có thể chưa được huấn luyện hoặc bị lỗi trong production. Cơ chế fallback đơn giản nhưng deterministic (trend extrapolation, rule-based policy) đảm bảo hệ thống không hoàn toàn sụp đổ khi ML component gặp vấn đề.
 
   \item \textbf{Phương pháp đánh giá phải phù hợp với bài toán thực tế}: Accuracy không đủ để đánh giá hệ thống cảnh báo. Lead time và miss rate phản ánh trực tiếp giá trị thực tiễn của hệ thống.
+
+  \item \textbf{Đặc tả reward đúng là yếu tố quyết định trong RL}: Phiên bản reward đầu (thưởng cố định cho mỗi lần bấm hành động) cho phép \textit{reward hacking} và khiến RL chỉ ngang luật tay, thậm chí thất bại ở rò rỉ nhanh. Chuyển sang reward \textit{outcome-based} (thưởng theo kết quả kiềm chế khí) cùng holding cost đã biến RL thành controller vượt trội. Bài học: trong RL, một hàm reward đặc tả sai có thể tạo hành vi suy biến tinh vi mà đường cong reward không lộ ra -- cần kiểm chứng chính sách bằng baseline mạnh (luật tay) và chỉ số kết quả độc lập.
 
   \item \textbf{Docker Compose giúp tái tạo kết quả}: Môi trường nhất quán là điều kiện tiên quyết cho nghiên cứu tái tạo được. Việc containerize toàn bộ hệ thống từ sớm tiết kiệm nhiều thời gian debug về sau.
 \end{itemize}
@@ -74,6 +76,6 @@ Khóa luận này đã trình bày việc thiết kế, triển khai và đánh 
 
 \section{Tổng kết}
 
-Đề tài đã chứng minh tính khả thi của việc áp dụng học tăng cường và dự báo chuỗi thời gian LSTM vào bài toán phát hiện và ứng phó rò rỉ khí gas thông minh trong nhà ở. Kiến trúc 4 lớp được thiết kế cân bằng giữa tính học thuật (có thể tái tạo, đánh giá khoa học) và tính thực tiễn (Docker Compose, Telegram bot, dashboard thời gian thực). Phương pháp đánh giá hai lượt oracle cung cấp framework so sánh công bằng có thể áp dụng cho các nghiên cứu tương tự.
+Đề tài đã chứng minh tính khả thi của việc áp dụng học tăng cường và dự báo chuỗi thời gian LSTM vào bài toán phát hiện và ứng phó rò rỉ khí gas thông minh trong nhà ở. Kiến trúc 4 lớp được thiết kế cân bằng giữa tính học thuật (có thể tái tạo, đánh giá khoa học) và tính thực tiễn (Docker Compose, Telegram bot, dashboard thời gian thực). Phương pháp đánh giá dựa trên kết quả thực tế kèm baseline luật tay cung cấp framework so sánh công bằng có thể áp dụng cho các nghiên cứu tương tự.
 
-Kết quả benchmark khẳng định rằng cách tiếp cận kết hợp dự báo LSTM + điều khiển RL vượt trội so với phương pháp ngưỡng tĩnh trên các chỉ số thực tiễn quan trọng, mở ra hướng phát triển đầy tiềm năng cho các hệ thống an toàn thông minh thế hệ tiếp theo.
+Kết quả benchmark khẳng định rằng cách tiếp cận kết hợp dự báo LSTM + điều khiển RL vượt trội so với phương pháp ngưỡng tĩnh \emph{và cả luật tay tinh chỉnh thủ công} trên các chỉ số thực tiễn quan trọng (bỏ sót 5\% so với 27--96\%, peak gas 222\,ppm so với 1{,}508\,ppm), mở ra hướng phát triển đầy tiềm năng cho các hệ thống an toàn thông minh thế hệ tiếp theo. Mô hình LSTM đã được kiểm chứng trên dữ liệu cảm biến thực, còn tầng RL chứng minh rằng một chính sách điều khiển đa cấp có thể được \emph{học hoàn toàn tự động} mà không cần con người đặt ngưỡng -- với điều kiện hàm reward được đặc tả đúng theo kết quả mong muốn.
