@@ -7,5 +7,7 @@
 			"path": "../../DACN"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "thesis-smart-home-gas-detection"
+	}
 }
