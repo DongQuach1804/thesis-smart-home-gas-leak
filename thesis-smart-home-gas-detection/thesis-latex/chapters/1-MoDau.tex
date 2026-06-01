@@ -47,10 +47,10 @@ Từ khảo sát trên, có thể thấy khoảng trống nghiên cứu: chưa c
 \begin{itemize}
   \item \textbf{Bộ mô phỏng vật lý trạng thái} mô hình hóa các tình huống rò rỉ thực tế (rò rỉ chậm, rò rỉ nhanh, thông gió) với nhãn ground-truth, phục vụ huấn luyện và đánh giá có thể tái tạo.
   \item \textbf{Mô hình LSTM dự báo trước} (forecasting LSTM) thay thế hoàn toàn cách tiếp cận phân loại trạng thái hiện tại.
-  \item \textbf{Bộ điều khiển PPO} được huấn luyện trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với hàm thưởng cân bằng giữa hiệu quả can thiệp và chi phí cảnh báo sai.
+  \item \textbf{Bộ điều khiển PPO} được huấn luyện trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với hàm thưởng \textit{outcome-based} (thưởng theo kết quả kiềm chế khí). Bộ điều khiển này được chứng minh \textbf{vượt cả một luật tay tinh chỉnh thủ công} trên các chỉ số an toàn (bỏ sót, peak gas, cảnh báo sai) -- một chính sách điều khiển đa cấp học hoàn toàn tự động.
   \item \textbf{Pipeline streaming hiện đại} sử dụng Apache Kafka + Spark Structured Streaming, cho phép xử lý dữ liệu cảm biến gần thời gian thực.
   \item \textbf{Tích hợp Telegram chatbot} cho phép nhận cảnh báo và điều khiển hệ thống từ xa.
-  \item \textbf{Phương pháp đánh giá hai lượt (oracle + controller)} đảm bảo so sánh công bằng giữa các bộ điều khiển.
+  \item \textbf{Phương pháp đánh giá công bằng}: định nghĩa miss theo kết quả thực tế và đo lead time bằng kịch bản đơn-leak xác định, kèm baseline luật tay để kiểm chứng nghiêm khắc giá trị của RL.
 \end{itemize}
 
 \section{Phạm vi và giới hạn của đề tài}
@@ -67,7 +67,7 @@ Khóa luận được tổ chức thành năm chương như sau:
   \item \textbf{Chương 1 – Mở đầu}: Trình bày tính cấp thiết của đề tài, tổng quan nghiên cứu liên quan, mục tiêu và phạm vi nghiên cứu.
   \item \textbf{Chương 2 – Cơ sở lý thuyết}: Trình bày các nền tảng lý thuyết được sử dụng trong đề tài bao gồm IoT, giao thức MQTT, Apache Kafka, Apache Spark, mạng LSTM, học tăng cường PPO và Telegram Bot API.
   \item \textbf{Chương 3 – Phương pháp thực hiện}: Mô tả chi tiết kiến trúc hệ thống 4 lớp, thiết kế từng thành phần, quy trình huấn luyện mô hình và phương pháp triển khai.
-  \item \textbf{Chương 4 – Thực nghiệm, đánh giá và thảo luận}: Trình bày kết quả huấn luyện mô hình, kết quả benchmark so sánh ba bộ điều khiển, và phân tích hệ thống trong điều kiện vận hành.
+  \item \textbf{Chương 4 – Thực nghiệm, đánh giá và thảo luận}: Trình bày kết quả huấn luyện mô hình, kết quả benchmark so sánh bốn bộ điều khiển (kể cả baseline luật tay), và phân tích hệ thống trong điều kiện vận hành.
   \item \textbf{Chương 5 – Kết luận và hướng phát triển}: Tóm tắt kết quả đạt được, rút ra bài học kinh nghiệm và đề xuất các hướng phát triển tiếp theo.
 \end{itemize}
 
