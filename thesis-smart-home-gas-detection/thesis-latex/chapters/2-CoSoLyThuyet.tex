@@ -355,23 +355,25 @@ trong đó $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$ là Temporal Difference
 \begin{equation}
 \begin{aligned}
   r_t = \; & -50\,\mathbf{1}[\text{gas}_t \geq 1000\,\text{ppm}] \\
-          & + 10\,\mathbf{1}[a_t \in \{2, 3\} \land \text{state} \in \{\text{LEAK\_SLOW}, \text{LEAK\_FAST}\}] \\
+          & + 0{,}3\,\mathbf{1}[\text{state} \in \{\text{LEAK\_SLOW}, \text{LEAK\_FAST}\} \land \text{gas}_t < 1000] \\
           & - 3\,\mathbf{1}[a_t = 1 \land \text{state} = \text{NORMAL}] \\
-          & - 15\,\mathbf{1}[a_t = 2 \land \text{state} = \text{NORMAL}] \\
-          & - 25\,\mathbf{1}[a_t = 3 \land \text{state} = \text{NORMAL}] \\
+          & - 15\,\mathbf{1}[a_t = 2 \land \text{state} = \text{NORMAL}, \text{lần đầu}] \\
+          & - 25\,\mathbf{1}[a_t = 3 \land \text{state} = \text{NORMAL}, \text{lần đầu}] \\
+          & - 0{,}5\,\mathbf{1}[\text{valve\_closed} \land \text{NORMAL}] - 0{,}1\,\mathbf{1}[\text{fan\_on} \land \text{NORMAL}] \\
           & - 0{,}05 \quad (\text{step cost})
 \end{aligned}
 \end{equation}
 
-Cấu trúc reward này phản ánh các quy tắc nghiệp vụ:
+Cấu trúc reward \textit{outcome-based} này phản ánh các quy tắc nghiệp vụ:
 \begin{itemize}
   \item \textbf{Phạt rất nặng ($-50$/bước)} khi để khí vượt ngưỡng nguy hiểm: bỏ sót là sai lầm nghiêm trọng nhất, mỗi bước "ngộ độc" đều bị tính.
-  \item \textbf{Thưởng ($+10$)} khi thực hiện can thiệp vật lý (FAN/VALVE) trong pha LEAK: đây là hành vi mong muốn cốt lõi.
-  \item \textbf{Phạt phân tầng theo chi phí hành động sai trong NORMAL}: $-3$ cho ALERT (chỉ gây phiền), $-15$ cho FAN (làm tốn điện), $-25$ cho CLOSE\_VALVE (ngắt nguồn cung cấp gas, trải nghiệm xấu).
-  \item \textbf{Step cost $-0{,}05$/bước} để tạo áp lực ra quyết định dứt khoát, tránh agent học cách "dùng dằng" mãi.
+  \item \textbf{Thưởng theo kết quả ($+0{,}3$/bước)} khi đang rò rỉ mà \emph{giữ được} khí dưới ngưỡng: thưởng cho \emph{kết quả} (kiềm chế thành công) thay vì cho \emph{hành động}. Điều này buộc agent chọn hành động thực sự hiệu quả -- với rò rỉ nhanh (tăng mũ) chỉ có đóng van mới giữ được khí thấp, vì quạt không đủ mạnh.
+  \item \textbf{Phạt phân tầng theo chi phí hành động sai trong NORMAL}: $-3$ cho ALERT (chỉ gây phiền), $-15$ cho FAN (tốn điện), $-25$ cho CLOSE\_VALVE (ngắt nguồn cung cấp gas, trải nghiệm xấu).
+  \item \textbf{Holding cost} ($-0{,}5$ giữ van, $-0{,}1$ giữ quạt trong NORMAL): tránh việc agent "lười" giữ van đóng vĩnh viễn; kết hợp cơ chế tự khôi phục (mở van/tắt quạt khi phòng an toàn), mỗi sự kiện rò rỉ trở nên độc lập.
+  \item \textbf{Step cost $-0{,}05$/bước} để tạo áp lực ra quyết định dứt khoát.
 \end{itemize}
 
-Quan trọng là \textbf{tỷ lệ} giữa các thành phần reward đã được điều chỉnh cẩn thận. Hệ số $-25$ cho CLOSE\_VALVE sai được chọn lớn một cách có chủ ý: nếu nhỏ quá, agent sẽ "lười" đóng van mọi lúc vì đóng van triệt tiêu được rủi ro rò rỉ; nhưng đóng van sai trong NORMAL sẽ ngắt nguồn cung cấp khí gas của hộ gia đình, một thiệt hại trải nghiệm thực tế đáng kể.
+Thiết kế này thay thế phần thưởng cố định $+10$ cho mỗi lần bấm FAN/VALVE của phiên bản đầu -- vốn có thể bị \textit{reward hacking} (agent farm điểm bằng cách spam hành động trong lúc rò rỉ mà không thực sự kiềm chế được khí). Việc chuyển sang thưởng theo kết quả là một quyết định thiết kế then chốt, được kiểm chứng định lượng ở Chương~\ref{c:thucnghiemdanhgia}.
 
 \section{Cơ sở dữ liệu thời gian và quan hệ}
 
