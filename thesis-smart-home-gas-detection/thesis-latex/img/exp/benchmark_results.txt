@@ -1,36 +1,10 @@
-2026-05-11 14:26:21,902 [INFO] device.simulator.sensor_simulator — Connecting to MQTT localhost:1883, topic=sensors/gas
-2026-05-11 14:26:22.002093: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
-2026-05-11 14:26:23.316980: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
-2026-05-11 14:26:26.377002: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
-To enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2026-05-11 14:26:26,516 [INFO] processing.ml.inference.forecaster_inference — Forecaster loaded from C:\Users\duonglv2\Downloads\thesis-smart-home-gas-leak\thesis-smart-home-gas-detection\processing\ml\lstm\gas_forecaster.keras — seq_len=60
-2026-05-11 14:26:30,412 [INFO] processing.ml.inference.rl_inference — PPO agent loaded from C:\Users\duonglv2\Downloads\thesis-smart-home-gas-leak\thesis-smart-home-gas-detection\processing\ml\rl\ppo_gas_agent.zip
+Benchmark (FIXED v3): 3 seeds x 4h. miss = leak where gas actually reached 1000 ppm.
 
-# seed=42: running ORACLE pass...
-  oracle: 9 leaks total, 8 would have reached CRITICAL.
-  running CONTROLLER pass: threshold...
-  running CONTROLLER pass: forecaster...
-  running CONTROLLER pass: rl...
+controller           miss%      alarm/hr        peak_gas   leaks
+THRESHOLD      96.0+-5.0      2.8+-1.0     1508.4+-88.2        8
+FORECASTER     96.0+-5.0      6.2+-1.9     1508.4+-88.2        8
+RULE           27.0+-14.0     4.9+-1.2      766.9+-217.3       9
+RL              5.0+-4.0      1.1+-0.4      221.8+-10.7       11
 
-# seed=43: running ORACLE pass...
-  oracle: 5 leaks total, 5 would have reached CRITICAL.
-  running CONTROLLER pass: threshold...
-  running CONTROLLER pass: forecaster...
-  running CONTROLLER pass: rl...
-
-# seed=44: running ORACLE pass...
-  oracle: 11 leaks total, 11 would have reached CRITICAL.
-  running CONTROLLER pass: threshold...
-  running CONTROLLER pass: forecaster...
-  running CONTROLLER pass: rl...
-
-====================================================================================================
-controller    leaks     lead_s   lead_med    miss%   alarm/hr   peak_gas
-----------------------------------------------------------------------------------------------------
-threshold         8     35±5                0.0±0.0%   2.8±1.0   1508±88 
-forecaster        8    138±26               4.2±5.9%   5.6±1.1   1508±88 
-rl               15   1803±755             15.0±10.8%   0.2±0.0     63±0  
-====================================================================================================
-Lead times measured against the ORACLE replay (same seed, no intervention).
-Higher lead_s = earlier warning; lower miss% & peak_gas = better mitigation.
-
+Note: threshold/forecaster only ALERT (no physical action) -> gas reaches critical ~96% -> high miss.
+rule and rl act physically (fan/valve). rl (PPO v3) dominates on miss, alarm and peak.
