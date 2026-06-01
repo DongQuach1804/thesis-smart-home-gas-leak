@@ -1,24 +1,33 @@
 """
-Custom Gymnasium environment for the gas-leak response problem.
+Custom Gymnasium environment for the gas-leak response problem (v3, outcome-based).
 
 The agent observes the current sensor state plus the forecaster's predicted
 risk in 5 minutes, and chooses ONE action per step:
 
     0  NO_OP        — do nothing
     1  ALERT_USER   — push a notification (cheap, non-physical)
-    2  FAN_ON       — start ventilation, accelerates gas decay
+    2  FAN_ON        — start ventilation, accelerates gas decay
     3  CLOSE_VALVE  — stop the leak entirely
 
-Reward shaping
---------------
-+10  if action correctly prevents gas from reaching CRITICAL
--50  per timestep where gas >= CRITICAL  (huge penalty for missing a leak)
--2   for ALERT_USER when leak_state == NORMAL    (false positive)
--5   for FAN_ON / CLOSE_VALVE when leak_state == NORMAL (costly false positive)
--0.05 per timestep (light step penalty to encourage decisive action)
+Reward shaping (v3 — outcome based)
+-----------------------------------
+-50   per timestep where gas >= CRITICAL              (missing a leak)
++0.3  per timestep while leaking AND gas < CRITICAL   (successful containment)
+-3    ALERT_USER when NORMAL                          (false positive)
+-15   FAN_ON (first activation) when NORMAL
+-25   CLOSE_VALVE (first activation) when NORMAL
+-0.5  per step while valve_closed AND NORMAL          (holding cost: gas supply cut)
+-0.1  per step while fan_on AND NORMAL                (holding cost: wasted power)
+-0.05 per timestep                                    (step cost)
 
-The env wraps the same physical world as the simulator so the policy
-trains on the exact dynamics that production sees.
+v3 fixes vs the first version:
+  * The old fixed "+10 for pressing FAN/VALVE during a leak" bonus is REMOVED —
+    it allowed reward-hacking (spamming FAN_ON to farm +10/step without actually
+    containing the gas). Reward is now tied to the OUTCOME (keeping gas below
+    CRITICAL), which forces the agent to CLOSE the valve for fast leaks because
+    fanning alone cannot contain an exponential leak.
+  * Holding cost + auto-restore make each leak event independent, so the agent
+    cannot "lazily" keep the valve shut forever.
 """
 from __future__ import annotations
 
@@ -46,7 +55,7 @@ HORIZON = 300
 
 
 class GasLeakEnv(gym.Env):
-    """Discrete-action environment over the simulator's physical model."""
+    """Discrete-action environment over the simulator's physical model (v3)."""
 
     metadata = {"render_modes": []}
 
@@ -85,29 +94,27 @@ class GasLeakEnv(gym.Env):
         return self._observe(p_forecast=0.0), {}
 
     def step(self, action: int):
-        # ── Apply action effects on the world ──────────────────────────
-        action_cost = 0.0
+        cost = 0.0
         leak_state = self.world.state
+        leaking = leak_state in (State.LEAK_SLOW, State.LEAK_FAST)
 
         if action == 1:                                       # ALERT_USER
-            # Cheap notification — but still costs if user is being spammed
-            action_cost = -3.0 if leak_state == State.NORMAL else 0.0
+            cost = -3.0 if leak_state == State.NORMAL else 0.0
             self.time_since_action = 0
         elif action == 2:                                     # FAN_ON
-            if not self.fan_on:
+            if not self.fan_on:                               # only first activation counts
                 self.fan_on = True
-                # STRONGER penalty so agent learns to wait until p5 is real
-                action_cost = -15.0 if leak_state == State.NORMAL else 0.0
+                if leak_state == State.NORMAL:
+                    cost = -15.0
             self.time_since_action = 0
         elif action == 3:                                     # CLOSE_VALVE
-            if not self.valve_closed:
+            if not self.valve_closed:                         # only first activation counts
                 self.valve_closed = True
-                # Stops the leak: force VENTILATING
-                if leak_state in (State.LEAK_SLOW, State.LEAK_FAST):
+                if leaking:
                     self.world.state = State.VENTILATING
                     self.world.state_age_s = 0.0
                 else:
-                    action_cost = -25.0       # Closing the gas valve in NORMAL is BAD
+                    cost = -25.0
             self.time_since_action = 0
         else:                                                 # NO_OP
             self.time_since_action += 1
@@ -115,26 +122,35 @@ class GasLeakEnv(gym.Env):
         # ── Step the world physics ─────────────────────────────────────
         STEP_FN[self.world.state](self.world, 1.0)
         if self.fan_on and self.world.state != State.VENTILATING:
-            # Fan accelerates decay even mid-leak (partially mitigates)
             self.world.gas = max(50.0, self.world.gas * 0.985)
         _maybe_transition(self.world, 1.0)
         self.world.state_age_s += 1.0
         self.t += 1
         self._gas_history.append(self.world.gas)
 
-        # ── Reward ─────────────────────────────────────────────────────
-        reward = -0.05 + action_cost  # small step cost
+        # ── Reward (outcome-based) ─────────────────────────────────────
+        reward = -0.05 + cost
         if self.world.gas >= CRITICAL_PPM:
             reward -= 50.0
-        # Bonus: if we acted during a leak and it never reached critical
-        if action in (2, 3) and leak_state in (State.LEAK_SLOW, State.LEAK_FAST):
-            reward += 10.0
+        # Containment: reward keeping a live leak below CRITICAL. Fan cannot
+        # contain a fast leak, so the agent must CLOSE_VALVE to earn this.
+        if leaking and self.world.gas < CRITICAL_PPM:
+            reward += 0.3
+        # Holding cost while NORMAL (cut gas supply / wasted power).
+        if self.world.state == State.NORMAL:
+            if self.valve_closed:
+                reward -= 0.5
+            if self.fan_on:
+                reward -= 0.1
+        # Auto-restore: once the room is safe again, reopen valve / stop fan.
+        if self.world.state == State.NORMAL and self.world.state_age_s > 20:
+            self.valve_closed = False
+            self.fan_on = False
 
         # ── Termination ────────────────────────────────────────────────
         terminated = False
         truncated = self.t >= self.episode_seconds
 
-        # Cheap forecast estimate via slope (training time only)
         p_forecast = self._cheap_forecast()
 
         return self._observe(p_forecast), float(reward), terminated, truncated, {

@@ -1,0 +1,195 @@
+% ============================================================
+%  Chương 1: Mở đầu
+% ============================================================
+
+\section{Tính cấp thiết của đề tài}
+
+Khí gas hóa lỏng (LPG) và khí tự nhiên (natural gas) được sử dụng rộng rãi trong các hộ gia đình và cơ sở sản xuất tại Việt Nam. Tuy nhiên, đây cũng là nguồn gây ra các vụ cháy nổ nghiêm trọng do rò rỉ không được phát hiện kịp thời. Theo báo cáo của Cục Phòng cháy chữa cháy và Cứu nạn cứu hộ \cite{pccc2023}, hàng năm xảy ra hàng trăm vụ cháy nổ liên quan đến khí gas tại Việt Nam, gây thiệt hại lớn về người và tài sản.
+
+Các hệ thống phát hiện khí gas thương mại hiện tại chủ yếu hoạt động theo nguyên tắc \textbf{ngưỡng tĩnh}: cảm biến đo nồng độ khí theo thời gian thực và kích hoạt cảnh báo khi nồng độ vượt một ngưỡng định sẵn (thường là 10\% LEL – Lower Explosive Limit). Phương pháp này có một số hạn chế cố hữu:
+
+\begin{itemize}
+  \item \textbf{Phản ứng muộn}: Cảnh báo chỉ phát ra khi khí đã đạt mức nguy hiểm, đúng lúc người dùng có thể đã ngửi thấy mùi. Không còn nhiều thời gian để sơ tán hay can thiệp.
+  \item \textbf{Tỷ lệ cảnh báo sai cao}: Các yếu tố môi trường như độ ẩm, nhiệt độ, và sự hiện diện của các khí khác có thể kích hoạt cảnh báo nhầm \cite{tian2019}.
+  \item \textbf{Không có khả năng dự báo}: Hệ thống ngưỡng tĩnh không thể phân biệt được một vụ rò rỉ đang tăng dần nguy hiểm (sẽ đạt ngưỡng trong vài phút) với một mức nền cao hơn bình thường nhưng ổn định.
+  \item \textbf{Phản ứng đơn lẻ}: Hầu hết chỉ phát âm thanh báo động, không tự động kích hoạt các biện pháp giảm thiểu như bật quạt thông gió hay đóng van gas.
+\end{itemize}
+
+Sự phát triển của Internet of Things (IoT) và học máy (Machine Learning) trong những năm gần đây mở ra khả năng xây dựng các hệ thống thông minh hơn: không chỉ phát hiện rò rỉ mà còn \textit{dự báo} nguy cơ trước khi xảy ra và \textit{tự động phản ứng} với chi phí can thiệp thấp nhất. Đây là hướng tiếp cận mà đề tài này theo đuổi.
+
+\section{Tổng quan về các nghiên cứu liên quan}
+
+Nhiều nhóm nghiên cứu đã đề xuất các cải tiến cho hệ thống phát hiện khí gas truyền thống.
+
+\textbf{Hướng tiếp cận cảm biến và IoT:} Saranya và cộng sự \cite{saranya2023} xây dựng hệ thống phát hiện khí gas sử dụng Arduino và cảm biến MQ-2, tích hợp cảnh báo qua SMS. Nwazor và cộng sự \cite{nwazor2023} đề xuất kiến trúc IoT dựa trên ESP8266 với điều khiển từ xa qua ứng dụng di động. Guo và cộng sự \cite{guo2019} sử dụng mạng cảm biến không dây di động để giám sát rò rỉ trong không gian rộng. Các phương pháp này cải thiện khả năng kết nối nhưng vẫn giữ nguyên cơ chế ngưỡng tĩnh.
+
+\textbf{Hướng tiếp cận học máy:} Abbas và Abdullah \cite{abbas2021} tích hợp mạng nơ-ron để phân loại mức độ nguy hiểm. Kutcharlapati và cộng sự \cite{kutcharlapati2023} áp dụng Machine Learning cho dự đoán rò rỉ đường ống gas. Tuy nhiên, hầu hết chỉ thực hiện phân loại trạng thái hiện tại, không dự báo tương lai.
+
+\textbf{Hướng tiếp cận LSTM và dự báo chuỗi thời gian:} Gambiroza và cộng sự \cite{gambiroza2020} chứng minh LSTM có thể học được đặc tính quá độ (transient) của cảm biến khí gas giá rẻ từ dữ liệu 20 giây đầu tiên sau khi cảm biến bật – một dạng dự báo sớm về loại khí. Đây là nền tảng lý thuyết cho việc sử dụng LSTM trong dự báo rủi ro khí gas.
+
+\textbf{Hướng tiếp cận học tăng cường:} Wei và cộng sự \cite{wei2022} đề xuất phương pháp offloading tính toán dựa trên Deep Reinforcement Learning cho phát hiện rò rỉ đường ống gas. Tuy nhiên, chưa có nghiên cứu nào kết hợp đồng thời dự báo LSTM và điều khiển RL trong một hệ thống IoT hoàn chỉnh cho môi trường nhà ở thông minh.
+
+Từ khảo sát trên, có thể thấy khoảng trống nghiên cứu: chưa có hệ thống nào tích hợp đồng thời (i) dự báo xác suất rủi ro theo thời gian thực bằng LSTM, (ii) bộ điều khiển tự động đa hành động bằng học tăng cường, và (iii) kiến trúc IoT hiện đại với streaming pipeline quy mô.
+
+\section{Mục tiêu và đóng góp của đề tài}
+
+\subsection{Mục tiêu}
+
+Đề tài này hướng đến xây dựng một \textbf{nền tảng IoT 4 lớp} cho phát hiện và ứng phó rò rỉ khí gas thông minh, với hai đóng góp kỹ thuật chính:
+
+\begin{enumerate}
+  \item Thay thế cơ chế cảnh báo thụ động bằng mô hình \textbf{dự báo LSTM} tính toán xác suất nồng độ khí vượt ngưỡng nguy hiểm trong 5 phút tới, dựa trên chuỗi đo lường 60 giây gần nhất.
+  \item Triển khai \textbf{bộ điều khiển học tăng cường PPO} học cách lựa chọn hành động tối ưu (cảnh báo người dùng, bật quạt thông gió, đóng van gas) dựa trên trạng thái hệ thống và xác suất rủi ro từ mô hình LSTM.
+\end{enumerate}
+
+\subsection{Đóng góp kỹ thuật}
+
+\begin{itemize}
+  \item \textbf{Bộ mô phỏng vật lý trạng thái} mô hình hóa các tình huống rò rỉ thực tế (rò rỉ chậm, rò rỉ nhanh, thông gió) với nhãn ground-truth, phục vụ huấn luyện và đánh giá có thể tái tạo.
+  \item \textbf{Mô hình LSTM dự báo trước} (forecasting LSTM) thay thế hoàn toàn cách tiếp cận phân loại trạng thái hiện tại.
+  \item \textbf{Bộ điều khiển PPO} được huấn luyện trong môi trường Gymnasium tích hợp vật lý bộ mô phỏng, với hàm thưởng \textit{outcome-based} (thưởng theo kết quả kiềm chế khí). Bộ điều khiển này được chứng minh \textbf{vượt cả một luật tay tinh chỉnh thủ công} trên các chỉ số an toàn (bỏ sót, peak gas, cảnh báo sai) -- một chính sách điều khiển đa cấp học hoàn toàn tự động.
+  \item \textbf{Pipeline streaming hiện đại} sử dụng Apache Kafka + Spark Structured Streaming, cho phép xử lý dữ liệu cảm biến gần thời gian thực.
+  \item \textbf{Tích hợp Telegram chatbot} cho phép nhận cảnh báo và điều khiển hệ thống từ xa.
+  \item \textbf{Phương pháp đánh giá công bằng}: định nghĩa miss theo kết quả thực tế và đo lead time bằng kịch bản đơn-leak xác định, kèm baseline luật tay để kiểm chứng nghiêm khắc giá trị của RL.
+\end{itemize}
+
+\section{Phạm vi và giới hạn của đề tài}
+
+Do điều kiện thực nghiệm, đề tài sử dụng \textbf{bộ mô phỏng phần mềm} thay cho phần cứng ESP32 thực tế trong quá trình huấn luyện mô hình. Bộ mô phỏng được xây dựng dựa trên các phương trình vật lý tham khảo từ tài liệu chuyên ngành, mô hình hóa các đặc tính động lực học của rò rỉ khí (tăng tuyến tính trong rò rỉ chậm, tăng hàm mũ trong rò rỉ nhanh, giảm theo hàm mũ trong pha thông gió).
+
+Đề tài tập trung vào \textbf{khí gas dân dụng} (LPG) trong môi trường nhà ở, không bao gồm các khí công nghiệp đặc thù. Cảm biến gas được mô phỏng là loại điện hóa đo nồng độ theo đơn vị ppm.
+
+\section{Cấu trúc của khóa luận}
+
+Khóa luận được tổ chức thành năm chương như sau:
+
+\begin{itemize}
+  \item \textbf{Chương 1 – Mở đầu}: Trình bày tính cấp thiết của đề tài, tổng quan nghiên cứu liên quan, mục tiêu và phạm vi nghiên cứu.
+  \item \textbf{Chương 2 – Cơ sở lý thuyết}: Trình bày các nền tảng lý thuyết được sử dụng trong đề tài bao gồm IoT, giao thức MQTT, Apache Kafka, Apache Spark, mạng LSTM, học tăng cường PPO và Telegram Bot API.
+  \item \textbf{Chương 3 – Phương pháp thực hiện}: Mô tả chi tiết kiến trúc hệ thống 4 lớp, thiết kế từng thành phần, quy trình huấn luyện mô hình và phương pháp triển khai.
+  \item \textbf{Chương 4 – Thực nghiệm, đánh giá và thảo luận}: Trình bày kết quả huấn luyện mô hình, kết quả benchmark so sánh bốn bộ điều khiển (kể cả baseline luật tay), và phân tích hệ thống trong điều kiện vận hành.
+  \item \textbf{Chương 5 – Kết luận và hướng phát triển}: Tóm tắt kết quả đạt được, rút ra bài học kinh nghiệm và đề xuất các hướng phát triển tiếp theo.
+\end{itemize}
+
+\section{Kế hoạch thực hiện và phân công công việc}
+
+\subsection*{Kế hoạch theo giai đoạn}
+
+\hspace*{-1cm}
+\resizebox{\textwidth}{!}{%
+\begin{ganttchart}[
+    x unit=0.6cm,
+    canvas/.append style={fill=none, draw=black!5, line width=1pt},
+    hgrid style/.style={draw=black!5, line width=.75pt},
+    vgrid={*1{draw=black!5, line width=.75pt}},
+    title/.style={draw=none, fill=none},
+    title label font=\bfseries,
+    title label node/.append style={below=2pt},
+    include title in canvas=false,
+    bar label font=\small\color{black!70},
+    bar label node/.append style={text width=7.5cm, align=left},
+    bar/.append style={draw=none, fill=primaryblue},
+    group height=.5,
+    group label node/.append style={text width=7.5cm, align=left, font=\bfseries},
+    link/.style={-latex, line width=1.5pt, primaryblue},
+    milestone/.append style={fill=criticalred, draw=criticalred},
+]{1}{15}
+
+\gantttitlelist{1,...,15}{1} \\
+
+% =========================
+% PHASE 1
+% =========================
+\ganttgroup{Giai đoạn 1: Phân tích và thiết kế kiến trúc (4-Layer)}{1}{4} \\
+\ganttbar{Khảo sát tài liệu và hệ thống Smart Home thông minh}{1}{2} \\
+\ganttbar{Thiết kế kiến trúc 4-layer (Device–Comm–Processing–App)}{2}{3} \\
+\ganttbar{Thiết kế pipeline dữ liệu (MQTT--Kafka--Spark--DB)}{3}{4} \\
+
+% =========================
+% PHASE 2
+% =========================
+\ganttgroup{Giai đoạn 2: Triển khai hệ thống IoT và Data Pipeline}{5}{8} \\
+\ganttbar{Triển khai cảm biến + ESP32 (Device Layer)}{5}{6} \\
+\ganttbar{Cấu hình MQTT Broker và Kafka Bridge}{6}{7} \\
+\ganttbar{Xây dựng Spark Streaming và lưu trữ InfluxDB}{7}{8} \\
+
+% =========================
+% PHASE 3
+% =========================
+\ganttgroup{Giai đoạn 3: Phát triển mô hình AI (Processing Layer)}{9}{12} \\
+\ganttbar{Tiền xử lý dữ liệu và huấn luyện LSTM}{9}{10} \\
+\ganttbar{Xây dựng RL Agent và thiết kế reward}{10}{11} \\
+\ganttbar{Tích hợp LSTM + RL vào pipeline realtime}{11}{12} \\
+
+% =========================
+% PHASE 4
+% =========================
+\ganttgroup{Giai đoạn 4: Application và hoàn thiện hệ thống}{13}{15} \\
+\ganttbar{Phát triển Backend API và Dashboard}{13}{14} \\
+\ganttbar{Tích hợp Grafana và Telegram Bot}{13}{14} \\
+\ganttbar{Đánh giá hệ thống và chuẩn bị bảo vệ}{14}{15} \\
+
+% =========================
+% MEETINGS
+% =========================
+\ganttgroup{Làm việc với GVHD}{1}{15} \\
+\ganttmilestone[name=meeting1]{Gặp giảng viên hướng dẫn}{0}
+\ganttmilestone[name=meeting2]{}{3}
+\ganttmilestone[name=meeting3]{}{6}
+\ganttmilestone[name=meeting4]{}{12}
+\ganttmilestone[name=midtermmeeting]{}{9}
+\ganttmilestone[name=finalmeeting]{}{15}
+\node[below, align=center] at (meeting1.south) {\footnotesize Lần 1};
+\node[below, align=center] at (meeting2.south) {\footnotesize Lần 2};
+\node[below, align=center] at (meeting3.south) {\footnotesize Lần 3};
+\node[below, align=center] at (meeting4.south) {\footnotesize Lần 4};
+\node[below, align=center] at (midtermmeeting.south) {\footnotesize Giữa kỳ};
+\node[below, align=center] at (finalmeeting.south) {\footnotesize Cuối kỳ}; \\
+\ganttmilestone{Báo cáo tiến độ}{1}
+\ganttmilestone{}{3}
+\ganttmilestone{}{5}
+\ganttmilestone{}{7}
+\ganttmilestone{}{9}
+\ganttmilestone{}{11}
+\ganttmilestone{}{13}
+\ganttmilestone{}{15} \\
+
+\end{ganttchart}
+}
+
+\subsection*{Phân công công việc}
+
+\begin{table}[H]
+\centering
+\caption{Phân công công việc giữa các sinh viên}
+\begin{tabular}{|c|p{9cm}|c|}
+\hline
+\textbf{STT} & \textbf{Nội dung công việc} & \textbf{Người thực hiện} \\
+\hline
+1 & Khảo sát các công trình nghiên cứu liên quan đến Smart Home, IoT, dự đoán dữ liệu môi trường và Học sâu tăng cường & Cả hai \\
+\hline
+2 & Thiết kế kiến trúc tổng thể hệ thống Smart Home theo mô hình IoT 4 lớp & Cả hai \\
+\hline
+3 & Triển khai Device Layer bao gồm cảm biến MQ-135, DHT22 và vi điều khiển ESP32 & Sinh viên 2 \\
+\hline
+4 & Xây dựng Communication Layer gồm MQTT Broker, MQTT--Kafka Bridge và hệ thống truyền dữ liệu & Sinh viên 2 \\
+\hline
+5 & Xây dựng pipeline xử lý dữ liệu realtime sử dụng Apache Kafka và Apache Spark & Sinh viên 2 \\
+\hline
+6 & Tiền xử lý dữ liệu và xây dựng mô hình dự báo nồng độ khí sử dụng LSTM & Sinh viên 1 \\
+\hline
+7 & Thiết kế môi trường và huấn luyện mô hình Học tăng cường (PPO) cho bài toán điều khiển thiết bị & Sinh viên 1 \\
+\hline
+8 & Tích hợp mô hình LSTM và RL vào pipeline xử lý dữ liệu realtime & Cả hai \\
+\hline
+9 & Phát triển hệ thống backend (Node.js/TypeScript) và xây dựng REST API & Sinh viên 1 \\
+\hline
+10 & Xây dựng hệ thống lưu trữ InfluxDB, dashboard Grafana và Telegram Bot & Sinh viên 1 \\
+\hline
+11 & Tích hợp toàn bộ hệ thống và kiểm thử thực nghiệm & Cả hai \\
+\hline
+12 & Đánh giá hệ thống, phân tích kết quả và hoàn thiện báo cáo khóa luận & Cả hai \\
+\hline
+\end{tabular}
+\label{tab:task_assignment}
+\end{table}
