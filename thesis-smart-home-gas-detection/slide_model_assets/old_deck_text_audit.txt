@@ -1,0 +1,63 @@
+slides: 34
+--- slide 1 ---
+ROUTER ON STICK | A smart home gas leak detection system using IoT, deep learning, and reinforcement learning | Ngày | : 16.04.2025 | Viết | Dương | , Minh Đông
+--- slide 3 ---
+Objectives | Mục | tiêu | đề | tài | Xây dựng hệ thống | Smart | Home | giám sát và điều khiển môi trường khí ga theo thời gian thực, tích hợp | IoT | + Xử lý dữ liệu lớn + Học sâu (LSTM) + Học tăng cường (RL) nhằm phát hiện sớm rò rỉ khí, đảm bảo an toàn và tối ưu hóa tiêu thụ năng lượng. | Xây dựng mô hình LSTM dự đoán xu hướng nồng độ khí ga dựa trên dữ liệu cảm biến lịch sử. | Phát triển mô hình Học sâu tăng cường (RL) để tự động đưa ra quyết định điều khiển thiết bị (quạt thông gió, cửa sổ, máy lọc không khí) nhằm đảm bảo an toàn và tiết kiệm năng lượng.
+--- slide 4 ---
+Objectives | Tập | dataset: | https://archive.ics.uci.edu/dataset/322/gas+sensor+array+under+dynamic+gas+mixtures | Tập dữ liệu | Số điểm dữ liệu | Số thuộc tính | Tên các thuộc tính | ethylene_methane | 4,208,261 | 19 | Time, CO_ppm, Ethylene_ppm, Sensor_1–Sensor_16 | ethylene_CO | 4,178,504 | 19 | Time, | CO_ppm | , | Ethylene_ppm | , Sensor_1–Sensor_16
+--- slide 5 ---
+Implementation Methodologies | Device / Sensor Layer | : | Lớp này gồm ESP32 hoặc Sensor Simulator, có nhiệm vụ thu thập dữ liệu môi trường như nồng độ gas, nhiệt độ, độ ẩm và thời gian đo. Dữ liệu sau khi thu thập được gửi lên hệ thống thông qua giao thức MQTT. | Communication Layer | : | Communication / Streaming Layer | : | Lớp này gồm MQTT Broker, MQTT-Kafka Bridge và Apache Kafka. | Processing Layer | : | Lớp này gồm Spark Streaming, mô hình LSTM, RL Agent, InfluxDB và PostgreSQL. | Application Layer | : | Lớp này gồm Backend API, Dashboard Web UI và Telegram Notification. Backend API đọc dữ liệu từ InfluxDB/PostgreSQL và cung cấp cho dashboard thông qua HTTP/REST API.
+--- slide 6 ---
+LSTM
+--- slide 7 ---
+Reinforcement Learning
+--- slide 8 ---
+Reinforcement Learning | PPO | Tham | số | Giá | trị | Algorithm | PPO | Policy | MlpPolicy | Environment | GasLeakEnv | Episode length | 1800 | giây | Number of | envs | 4 | Training steps | 400000 | n_steps | 512 | batch_size | 128 | gamma | 0.99 | gae_lambda | 0.95 | learning_rate | 3e-4 | ent_coef | 0.01 | Reward normalization | Có | , | VecNormalize
+--- slide 9 ---
+Reinforcement Learning | Input PPO | Output PPO
+--- slide 10 ---
+Reinforcement Learning | Reward | R = - 0.05 + | C_action | - 50 × I ( | gas_ppm | >= 1000) + 0.3 × I (leaking and | gas_ppm | < 1000) - 0.5 × I (NORMAL and | valve_closed | ) - 0.1 × I (NORMAL and | fan_on | ) | Chú | thích | : | I (condition) = 1 | nếu | điều | kiện | đúng | I (condition) = 0 | nếu | điều | kiện | sai | Điều | kiện | Giá | trị | ALERT_USER | khi môi trường bình thường | -3 | FAN_ON | lần đầu khi môi trường bình thường | -15 | LOSE_VALVE | lần đầu khi môi trường bình thường | -25 | Hành | động | hợp | lý | khi | có | rò | rỉ | Không | phạt | trực | tiếp | Mỗi | timestep | -0.05 | Thành | phần | reward | Ý | nghĩa | -0.05 | mỗi bước | Khuyến | khích | xử | lý | nhanh | , | tránh | kéo | dài | -50 | khi gas ≥ 1000 ppm | Phạt nặng nếu để môi trường nguy hiểm | +0.3 | khi rò rỉ nhưng gas < 1000 ppm | Thưởng khi kiểm soát được rò rỉ | -0.5 | khi giữ van đóng lúc bình thường | Tránh | cắt | gas | không | cần | thiết | -0.1 | khi giữ quạt bật lúc bình thường | Tiết kiệm năng lượng | Phạt | false action khi NORMAL | Tránh | điều | khiển | bừa
+--- slide 11 ---
+Current Progress | Đã | hoàn | thiện | việc | thu | thập | , | làm | sạch | và | phân | tích | khám | phá | (EDA) | trên | bộ | dữ | liệu | UCI Gas Sensor Array. | Xây | dựng | thành | công | kiến | trúc | mô | hình | chuỗi | thời | gian | LSTM | để | dự | báo | nồng | độ | khí | CO. | Cấu | hình | mô | hình | sử | dụng | window_size | = 60 ( | nhìn | lại | 60 timestep) | để | dự | báo | forecast_horizon | = 10 (10 timestep | tiếp | theo | ).
+--- slide 12 ---
+Current Progress | Mô | hình | đạt | độ | chính | xác | cao | với | hệ | số | R^2 = 0.90, | sai | số | MAE ở | mức | thấp | (0.48 ppm).
+--- slide 13 ---
+Current Progress
+--- slide 14 ---
+Current Progress
+--- slide 15 ---
+Current Progress
+--- slide 16 ---
+Current Progress
+--- slide 17 ---
+Current Progress
+--- slide 18 ---
+Current Progress
+--- slide 19 ---
+Current Progress
+--- slide 20 ---
+Current Progress | Các testcase: | TC1: | Hệ thống bình thường không điều khiển bừa | TC2: | LSTM dự đoán được xu hướng tăng rủi ro | TC3: RL | phản | ứng | với | tình | huống | nguy | hiểm | TC4: | RL giảm điều khiển khi môi trường phục hồi
+--- slide 21 ---
+Current Progress | Testcase 1:
+--- slide 22 ---
+Current Progress
+--- slide 23 ---
+Current Progress | TC1 xác nhận hệ thống hoạt động ổn định trong môi trường bình thường. LSTM không dự đoán nguy cơ tăng bất thường, hệ thống không phát cảnh báo và RL giữ hành động NO_OP, chứng minh hệ thống không điều khiển bừa.
+--- slide 24 ---
+Current Progress | Testcase 2:
+--- slide 25 ---
+Current Progress
+--- slide 26 ---
+Current Progress | Trong | kịch | bản | TC2_COOKING_CLOSED_ROOM, | dữ | liệu | mô | phỏng | thể | hiện | tình | huống | nấu | ăn | trong | không | gian | kín | , | làm | nồng | độ | khí | tăng | dần | theo | thời | gian | . | Hệ | thống | ghi | nhận | nồng | độ | khí | khoảng | 420 ppm | và | mô | hình | LSTM | dự | đoán | rủi | ro | tiếp | tục | tăng | trong | ngắn | hạn | . | Trạng | thái | hệ | thống | được | phân | loại | ở | mức | cảnh | báo | , | từ | đó | tác | nhân | điều | khiển | cần | lựa | chọn | hành | động | thông | gió | như | bật | quạt | hoặc | mở | cửa | sổ | để | giảm | nguy | cơ | tích | tụ | khí | .
+--- slide 27 ---
+Current Progress | Testcase 3:
+--- slide 28 ---
+Current Progress
+--- slide 29 ---
+Current Progress | TC3 đạt yêu cầu đánh giá tình huống rò rỉ gas nguy hiểm. Khi nồng độ gas tăng nhanh và vượt ngưỡng nguy hiểm, mô hình LSTM dự đoán rủi ro cao trong 5 phút tiếp theo, hệ thống phát cảnh báo | ALERT | , và tác nhân RL chọn hành động | CLOSE_VALVE | để ngăn nguồn gas. Kịch bản này dùng để đánh giá khả năng phát hiện và phản ứng với rò rỉ; quá trình phục hồi sau điều khiển được đánh giá riêng trong TC4.
+--- slide 30 ---
+Current Progress | Testcase 4:
+--- slide 31 ---
+Current Progress
+--- slide 32 ---
+Current Progress | TC4 đạt yêu cầu đánh giá khả năng phục hồi sau điều khiển. Khi nồng độ gas ban đầu ở mức nguy hiểm, RL chọn hành động mạnh là | CLOSE_VALVE | . Khi nồng độ gas giảm dần, RL chuyển sang | FAN_ON | , và khi môi trường trở về bình thường, hệ thống trả về | NO_OP | . Điều này cho thấy RL không chỉ phản ứng với nguy hiểm mà còn biết giảm mức điều khiển khi rủi ro thấp, giúp tiết kiệm năng lượng và tránh điều khiển không cần thiết.
