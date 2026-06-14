@@ -111,7 +111,7 @@ def main() -> None:
     # Loss/optim footer (well below blocks)
     ax.text(5.0, 0.4,
             "Loss: weighted binary cross-entropy  ·  "
-            "Optim: Adam(lr=$10^{-3}$)  ·  Epochs: 15, batch=128",
+            "Optim: Adam(lr=$10^{-3}$)  ·  Epochs: 20, batch=128",
             ha="center", va="center", fontsize=10.5, color="#555",
             bbox=dict(boxstyle="round,pad=0.4",
                       facecolor="#f7f7f7", edgecolor="#cccccc",
