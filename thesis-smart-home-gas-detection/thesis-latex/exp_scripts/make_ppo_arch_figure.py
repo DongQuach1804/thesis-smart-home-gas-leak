@@ -1,11 +1,11 @@
-"""Block diagram of the PPO MLP policy/value network for GasLeakEnv.
+# -*- coding: utf-8 -*-
+"""So do khoi kien truc PPO actor-critic cho GasLeakEnv -- ban ve lai sach hon.
 
-Stable-Baselines3 MlpPolicy (default): two hidden layers of 64 units,
-tanh activations, shared trunk, separate policy head (4 logits) and
-value head (scalar).
+SB3 MlpPolicy (mac dinh): trunk dung chung 2 lop Dense 64 (tanh), tach policy
+head (4 logits -> softmax) va value head (scalar). Phien ban nay bo cuc gon,
+khong con doan "cut" o phia duoi, vong lap agent-env duoc noi lien mach.
 
 Output: thesis-latex/img/ppo_arch.png
-Run:    python thesis-latex/exp_scripts/make_ppo_arch_figure.py
 """
 from __future__ import annotations
 from pathlib import Path
@@ -19,163 +19,106 @@ OUT = ROOT / "img" / "ppo_arch.png"
 
 
 def block(ax, x, y, w, h, title, sub, fill, border, fs=12):
-    box = FancyBboxPatch(
-        (x, y), w, h,
-        boxstyle="round,pad=0.18,rounding_size=0.18",
-        linewidth=1.7, edgecolor=border, facecolor=fill,
-    )
-    ax.add_patch(box)
+    ax.add_patch(FancyBboxPatch(
+        (x, y), w, h, boxstyle="round,pad=0.16,rounding_size=0.16",
+        linewidth=1.8, edgecolor=border, facecolor=fill))
     if sub:
-        ax.text(x + w / 2, y + h * 0.66, title,
-                ha="center", va="center", fontsize=fs, weight="bold",
-                color="#1f2d3d")
-        ax.text(x + w / 2, y + h * 0.28, sub,
-                ha="center", va="center", fontsize=fs - 2.5,
-                color="#445063")
+        ax.text(x + w / 2, y + h * 0.64, title, ha="center", va="center",
+                fontsize=fs, weight="bold", color="#1f2d3d")
+        ax.text(x + w / 2, y + h * 0.27, sub, ha="center", va="center",
+                fontsize=fs - 2.5, color="#445063")
     else:
-        ax.text(x + w / 2, y + h / 2, title,
-                ha="center", va="center", fontsize=fs, weight="bold",
-                color="#1f2d3d")
+        ax.text(x + w / 2, y + h / 2, title, ha="center", va="center",
+                fontsize=fs, weight="bold", color="#1f2d3d")
 
 
-def arrow(ax, x1, y1, x2, y2, color="#34495e", label=None, label_xy=None,
-          lw=1.7):
-    a = FancyArrowPatch(
-        (x1, y1), (x2, y2),
-        arrowstyle="-|>", mutation_scale=17, linewidth=lw, color=color,
-    )
-    ax.add_patch(a)
-    if label and label_xy:
-        ax.text(label_xy[0], label_xy[1], label,
-                ha="center", va="center", fontsize=10, color=color,
-                bbox=dict(boxstyle="round,pad=0.22",
-                          facecolor="white", edgecolor="#d0d0d0",
-                          linewidth=0.6))
+def arrow(ax, x1, y1, x2, y2, color="#34495e", label=None, lxy=None, lw=1.8,
+          rad=0.0):
+    cs = ("arc3,rad=%s" % rad) if rad else None
+    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>",
+                 mutation_scale=18, linewidth=lw, color=color,
+                 connectionstyle=cs))
+    if label and lxy:
+        ax.text(lxy[0], lxy[1], label, ha="center", va="center",
+                fontsize=10, color=color,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white",
+                          edgecolor="#d0d0d0", linewidth=0.6))
 
 
-def main() -> None:
+def main():
     plt.rcParams["font.family"] = "DejaVu Sans"
-    fig, ax = plt.subplots(figsize=(17, 11))
+    fig, ax = plt.subplots(figsize=(15, 8.2))
     ax.set_xlim(0, 26)
     ax.set_ylim(0, 14)
     ax.set_aspect("equal")
     ax.axis("off")
 
-    ax.text(13.0, 13.3,
-            "Kiến trúc PPO (Actor--Critic) cho GasLeakEnv",
-            ha="center", va="center", fontsize=17, weight="bold",
+    ax.text(13.0, 13.4, "Kiến trúc PPO (Actor–Critic) cho GasLeakEnv",
+            ha="center", va="center", fontsize=16.5, weight="bold",
             color="#1f2d3d")
 
-    obs_fill, obs_b = "#fef3e6", "#e8a25b"
-    mlp_fill, mlp_b = "#e7eef8", "#4a6fa5"
-    pol_fill, pol_b = "#fae7e7", "#b35b5b"
-    val_fill, val_b = "#e6f4ea", "#5ba26c"
-    env_fill, env_b = "#f0e7f7", "#7e3b8e"
+    obs_f, obs_b = "#fef3e6", "#e8a25b"
+    mlp_f, mlp_b = "#e7eef8", "#4a6fa5"
+    pol_f, pol_b = "#fae7e7", "#b35b5b"
+    val_f, val_b = "#e6f4ea", "#5ba26c"
+    env_f, env_b = "#f0e7f7", "#7e3b8e"
 
-    # -------- TOP ROW: feed-forward pipeline --------
-    y_row = 8.0
-    h_row = 2.6
+    yr, hr = 8.4, 2.6
+    block(ax, 0.5, yr, 4.6, hr, "Trạng thái $s_t$ (8 chiều)",
+          "gas, T, H, slope, $p_{5\\min}$,\nfan, valve, $\\Delta t_{\\mathrm{act}}$ — chuẩn hoá [0,1]",
+          obs_f, obs_b)
+    block(ax, 6.4, yr, 3.5, hr, "Dense 64", "tanh · $8\\to64$\n576 tham số", mlp_f, mlp_b)
+    block(ax, 10.9, yr, 3.5, hr, "Dense 64", "tanh · $64\\to64$\n4.160 tham số", mlp_f, mlp_b)
 
-    block(ax, 0.5, y_row, 4.5, h_row,
-          "State $s_t$ (8 chiều)",
-          "gas, T, H, slope, $p_{5\\min}$,\n"
-          "fan, valve, $\\Delta t_{\\mathrm{act}}$\n"
-          "chuẩn hoá $[0,1]$",
-          obs_fill, obs_b)
+    # Heads
+    block(ax, 15.7, yr + 1.45, 3.7, 1.5, "Policy head", "Dense $64\\to4$ · logits", pol_f, pol_b, fs=11)
+    block(ax, 20.2, yr + 1.45, 5.3, 1.5, "Softmax $\\pi_\\theta(a|s)$", "NO_OP/ALERT/FAN/VALVE", pol_f, pol_b, fs=11)
+    block(ax, 15.7, yr - 0.05, 3.7, 1.5, "Value head", "Dense $64\\to1$", val_f, val_b, fs=11)
+    block(ax, 20.2, yr - 0.05, 5.3, 1.5, "$V_\\phi(s)$ — scalar", "ước lượng giá trị", val_f, val_b, fs=11)
 
-    block(ax, 6.2, y_row, 3.6, h_row,
-          "Dense 64",
-          "tanh\n$8 \\to 64$\n576 tham số",
-          mlp_fill, mlp_b)
+    ym = yr + hr / 2
+    arrow(ax, 5.1, ym, 6.4, ym, label="(8)", lxy=(5.75, ym + 0.55))
+    arrow(ax, 9.9, ym, 10.9, ym, label="(64)", lxy=(10.4, ym + 0.55))
+    arrow(ax, 14.4, ym, 15.7, yr + 2.2, label="(64)", lxy=(15.0, ym + 0.9))
+    arrow(ax, 14.4, ym, 15.7, yr + 0.7, label="(64)", lxy=(15.0, ym - 0.9))
+    arrow(ax, 19.4, yr + 2.2, 20.2, yr + 2.2, color="#b35b5b")
+    arrow(ax, 19.4, yr + 0.7, 20.2, yr + 0.7, color="#5ba26c")
 
-    block(ax, 10.8, y_row, 3.6, h_row,
-          "Dense 64",
-          "tanh\n$64 \\to 64$\n$4{,}160$ tham số",
-          mlp_fill, mlp_b)
+    # ----- Agent-Environment loop (noi lien mach, khong cut) -----
+    block(ax, 16.0, 3.3, 9.5, 2.0, "Action sampler",
+          "$a_t \\sim \\pi_\\theta(\\cdot|s_t)$ · 4 hành động rời rạc", pol_f, pol_b, fs=12)
+    block(ax, 3.5, 3.3, 9.5, 2.0, "GasLeakEnv (gymnasium)",
+          "máy trạng thái vật lý · trả về $s_{t+1}, r_{t+1}$", env_f, env_b, fs=12)
 
-    # Heads vertical split
-    block(ax, 15.7, y_row + 1.50, 3.8, 1.55,
-          "Policy head",
-          "Dense $64 \\to 4$  ·  logits",
-          pol_fill, pol_b, fs=11.5)
-    block(ax, 20.3, y_row + 1.50, 5.2, 1.55,
-          "Softmax $\\pi_\\theta(a|s)$",
-          "NO_OP / ALERT / FAN / VALVE",
-          pol_fill, pol_b, fs=11.5)
+    # softmax -> action sampler (di xuong)
+    arrow(ax, 22.85, yr + 1.45, 22.85, 5.3, color="#b35b5b",
+          label="$\\pi_\\theta(a|s)$", lxy=(24.0, 6.9), rad=0.0)
+    # action sampler -> env
+    arrow(ax, 16.0, 4.3, 13.0, 4.3, color="#b35b5b", label="$a_t$", lxy=(14.5, 4.75))
+    # env -> state (di len, khep vong)
+    arrow(ax, 3.5, 4.3, 2.4, 4.3, color="#7e3b8e")
+    arrow(ax, 2.4, 4.3, 2.4, 8.4, color="#7e3b8e",
+          label="$s_{t+1}, r_{t+1}$", lxy=(1.25, 6.4))
 
-    block(ax, 15.7, y_row - 0.05, 3.8, 1.55,
-          "Value head",
-          "Dense $64 \\to 1$",
-          val_fill, val_b, fs=11.5)
-    block(ax, 20.3, y_row - 0.05, 5.2, 1.55,
-          "$V_\\phi(s)$ — scalar",
-          "ước lượng giá trị trạng thái",
-          val_fill, val_b, fs=11.5)
+    ax.text(0.6, 7.55, "Mạng nơ-ron (lượt truyền xuôi)", ha="left",
+            va="center", fontsize=10, style="italic", color="#888")
+    ax.text(0.6, 5.75, "Vòng tương tác Agent–Environment", ha="left",
+            va="center", fontsize=10, style="italic", color="#888")
+    ax.plot([0.5, 25.5], [6.75, 6.75], color="#cccccc", lw=0.9, ls="--")
 
-    # Horizontal pipeline arrows
-    y_mid = y_row + h_row / 2
-    arrow(ax, 5.0, y_mid, 6.2, y_mid, label="(8)",
-          label_xy=(5.6, y_mid + 0.5))
-    arrow(ax, 9.8, y_mid, 10.8, y_mid, label="(64)",
-          label_xy=(10.3, y_mid + 0.5))
-
-    # Split arrows from trunk to heads
-    arrow(ax, 14.4, y_mid, 15.7, y_row + 2.27, label="(64)",
-          label_xy=(14.95, y_mid + 0.85))
-    arrow(ax, 14.4, y_mid, 15.7, y_row + 0.72, label="(64)",
-          label_xy=(14.95, y_mid - 0.85))
-
-    # Heads -> outputs
-    arrow(ax, 19.5, y_row + 2.27, 20.3, y_row + 2.27, color="#b35b5b")
-    arrow(ax, 19.5, y_row + 0.72, 20.3, y_row + 0.72, color="#5ba26c")
-
-    # -------- BOTTOM ROW: agent-env loop --------
-    block(ax, 17.5, 3.4, 8.0, 2.0,
-          "Action sampler",
-          "$a_t \\sim \\pi_\\theta(\\cdot | s_t)$  ·  4 hành động rời rạc",
-          pol_fill, pol_b, fs=12)
-
-    block(ax, 4.5, 3.4, 9.5, 2.0,
-          "GasLeakEnv (gymnasium)",
-          "physical state machine  ·  trả về $s_{t+1}, r_{t+1}$",
-          env_fill, env_b, fs=12)
-
-    # Loop arrows
-    arrow(ax, 22.9, y_row + 1.5, 22.9, 5.4, color="#b35b5b",
-          label="$\\pi_\\theta$", label_xy=(23.5, 6.7))
-    arrow(ax, 17.5, 4.4, 14.0, 4.4, color="#b35b5b",
-          label="$a_t$", label_xy=(15.75, 4.85))
-    arrow(ax, 4.5, 4.4, 2.5, 4.4, color="#7e3b8e")
-    arrow(ax, 2.5, 4.4, 2.5, 8.0, color="#7e3b8e",
-          label="$s_{t+1}, r_{t+1}$", label_xy=(1.3, 6.2))
-
-    # Subtle separator
-    ax.plot([0.5, 25.5], [6.9, 6.9], color="#cccccc",
-            linewidth=0.8, linestyle="--")
-    ax.text(0.5, 7.20,
-            "Neural network (forward pass)",
-            ha="left", va="center", fontsize=10.5, style="italic",
-            color="#777")
-    ax.text(0.5, 6.60,
-            "Vòng tương tác Agent--Environment",
-            ha="left", va="center", fontsize=10.5, style="italic",
-            color="#777")
-
-    # Hyperparameters footer
-    ax.text(13.0, 1.3,
-            "PPO: clip $\\epsilon = 0{,}2$  ·  $\\gamma=0{,}99$  ·  "
-            "$\\lambda_{\\mathrm{GAE}}=0{,}95$  ·  "
-            "lr $= 3 \\times 10^{-4}$  ·  ent_coef $= 0{,}01$  ·  "
-            "n_envs=4, n_steps=512, batch=128",
-            ha="center", va="center", fontsize=11, color="#555",
-            bbox=dict(boxstyle="round,pad=0.4",
-                      facecolor="#f7f7f7", edgecolor="#cccccc",
-                      linewidth=0.6))
+    ax.text(13.0, 1.55,
+            "PPO: clip $\\epsilon=0{,}2$ · $\\gamma=0{,}99$ · "
+            "$\\lambda_{\\mathrm{GAE}}=0{,}95$ · lr $=3\\times10^{-4}$ · "
+            "ent_coef $=0{,}01$ · n_envs=4 · n_steps=512 · batch=128 · "
+            "VecNormalize · tổng ~5.060 tham số",
+            ha="center", va="center", fontsize=10.5, color="#555",
+            bbox=dict(boxstyle="round,pad=0.4", facecolor="#f7f7f7",
+                      edgecolor="#cccccc", linewidth=0.6))
 
     fig.tight_layout()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(OUT, dpi=170, bbox_inches="tight", facecolor="white")
-    print(f"saved -> {OUT}")
+    print("saved ->", OUT)
 
 
 if __name__ == "__main__":
