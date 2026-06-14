@@ -184,15 +184,49 @@ Tổng số tham số: $\sim$5,000 – đủ nhỏ để suy luận trong vài m
 
 trong đó $p_{pos}$ là tỷ lệ mẫu positive trong tập huấn luyện.
 
+\subsubsection{Hai phiên bản mô hình LSTM được huấn luyện}
+\label{sssec:lstm_two_models}
+
+Một điểm cần làm rõ ở mức triển khai: trong đề tài, \emph{cùng một kiến trúc} LSTM (Hình~\ref{fig:lstm_arch}) được huấn luyện thành \textbf{hai mô hình riêng biệt}, cả hai cùng được đóng gói trong thư mục \texttt{processing/ml/lstm/} và phục vụ hai mục tiêu khác nhau:
+
+\begin{enumerate}
+  \item \textbf{Mô hình mô phỏng} (\texttt{gas\_forecaster.keras}): huấn luyện trên trace 8 giờ sinh từ bộ mô phỏng (seed 42). Đây là forecaster \emph{mặc định} được nạp trong pipeline Spark, vì nhãn rò rỉ được biết chính xác và phân phối dữ liệu khớp với môi trường vận hành thực tế của hệ thống điều khiển.
+  \item \textbf{Mô hình dữ liệu thực} (\texttt{gas\_forecaster\_kaggle.keras}): huấn luyện trên tập cảm biến IoT thực Kaggle ($\sim$405K mẫu, 3 thiết bị Raspberry Pi). Mô hình này không dùng để vận hành mà để \emph{kiểm chứng khả năng tổng quát hoá} sim-to-real của kiến trúc đề xuất (kết quả định lượng ở Chương~\ref{c:thucnghiemdanhgia}).
+\end{enumerate}
+
+Bảng~\ref{tab:lstm_two_models} đối chiếu cấu hình huấn luyện của hai mô hình. Điểm mấu chốt là kiến trúc mạng, hàm mất mát và quy tắc dán nhãn theo kiểu \emph{forecasting} được giữ \textbf{nguyên} giữa hai mô hình; chỉ khác nguồn dữ liệu, ngưỡng sinh nhãn và một vài siêu tham số huấn luyện. Nhờ vậy, việc mô hình dữ liệu thực đạt Recall cao trên Kaggle trở thành bằng chứng cho thấy \emph{bản thân kiến trúc} -- chứ không phải đặc thù riêng của bộ mô phỏng -- mới là yếu tố nắm bắt được tín hiệu xu hướng tăng nồng độ khí.
+
+\begin{table}[H]
+\centering
+\caption{Đối chiếu hai mô hình LSTM cùng kiến trúc}
+\label{tab:lstm_two_models}
+\small
+\begin{tabular}{p{3.2cm}p{4.4cm}p{4.6cm}}
+\toprule
+\textbf{Hạng mục} & \textbf{Mô hình mô phỏng} & \textbf{Mô hình dữ liệu thực (Kaggle)} \\
+\midrule
+File trọng số   & \texttt{gas\_forecaster.keras} & \texttt{gas\_forecaster\_kaggle.keras} \\
+Nguồn dữ liệu   & Trace mô phỏng 8\,h, 1\,Hz, seed 42 & Kaggle Env. Sensor, $\sim$405K mẫu, 3 thiết bị \\
+Đặc trưng đầu vào & cửa sổ 60 $\times$ (gas, T, H) & cửa sổ 60 $\times$ (lpg, temp, humidity) \\
+Ngưỡng dán nhãn & gas tương lai $> 1000$\,ppm & lpg tương lai $> \mathrm{LPG}_{p95}$ \\
+Kiến trúc mạng  & \multicolumn{2}{l}{\emph{Giống nhau}: Input(60,3)$\to$LSTM(32)$\to$Dropout(0,2)$\to$Dense(16)$\to$Dense(1)} \\
+Epochs / batch  & 20 / 128 & 25 / 256 \\
+Vai trò         & forecaster vận hành (mặc định) & kiểm chứng sim-to-real \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsubsection{Fallback mechanism}
 
 Khi mô hình Keras chưa được huấn luyện (file \texttt{.keras} chưa tồn tại), forecaster tự động sử dụng \textbf{trend extrapolation fallback}. Cơ chế này ước tính slope tuyến tính trên 30 mẫu gần nhất bằng \texttt{numpy.polyfit}, sau đó thực hiện ngoại suy tới chân trời $H=300$\,giây. Nếu slope vượt 0{,}5 ppm/s, fallback bổ sung thêm nhánh \textbf{ngoại suy mũ} (exponential) bằng cách ước lượng hệ số tăng trưởng trung bình trên 15 mẫu cuối. Giá trị dự báo cuối cùng là \texttt{max(linear, exp)} và được ánh xạ sang xác suất qua hàm logistic với biên (margin) $200$\,ppm xung quanh ngưỡng nguy hiểm. Cơ chế này đảm bảo hệ thống vẫn cho ra xác suất dự báo hợp lý ngay cả khi mô hình Keras chưa sẵn sàng, đồng thời chống lại các trường hợp tăng phi tuyến (LEAK\_FAST) mà phép ngoại suy tuyến tính sẽ đánh giá thấp.
 
 \subsection{RL Controller (PPO)}
 
-\subsubsection{Môi trường GasLeakEnv}
+\subsubsection{Môi trường (Environment): \texttt{GasLeakEnv}}
 
-\texttt{GasLeakEnv} kế thừa từ \texttt{gymnasium.Env} và bao bọc bộ mô phỏng vật lý:
+Bài toán điều khiển được mô hình hoá thành một \textbf{quá trình quyết định Markov} (MDP) gồm bốn thành phần: môi trường, không gian trạng thái, không gian hành động và hàm phần thưởng. Bốn thành phần này được trình bày lần lượt trong các mục dưới đây.
+
+\texttt{GasLeakEnv} kế thừa từ \texttt{gymnasium.Env} và bao bọc bộ mô phỏng vật lý đã mô tả ở mục lớp thiết bị, biến nó thành một môi trường tương tác chuẩn cho thuật toán RL: ở mỗi bước, môi trường nhận một hành động, cập nhật động lực vật lý của phòng (nồng độ khí, trạng thái rò rỉ), rồi trả về trạng thái kế tiếp và phần thưởng tương ứng.
 
 \begin{lstlisting}[language=Python, caption={Cấu trúc GasLeakEnv (đã được đơn giản hoá)}]
 class GasLeakEnv(gymnasium.Env):
@@ -225,7 +259,51 @@ class GasLeakEnv(gymnasium.Env):
         return self._observe(), reward, False, self.t >= self.T, {}
 \end{lstlisting}
 
-\textbf{Vector quan sát} có 8 đặc trưng, mỗi thành phần được chuẩn hoá về $[0,1]$ để policy network học ổn định: nồng độ khí, nhiệt độ, độ ẩm, độ dốc (\textit{slope}) ước tính trên 30 mẫu cuối, xác suất rủi ro 5 phút $p_{5\min}$ từ LSTM, trạng thái quạt, trạng thái van, và thời gian kể từ hành động cuối. Hai biến trạng thái nội bộ (\texttt{fan\_on}, \texttt{valve\_closed}) cho phép policy biết các can thiệp đã được kích hoạt và không lặp lại không cần thiết.
+\subsubsection{Không gian trạng thái (State space)}
+
+Không gian trạng thái là một vector quan sát \textbf{8 chiều}, mỗi thành phần được chuẩn hoá về $[0,1]$ để mạng policy học ổn định (chi tiết ở Bảng~\ref{tab:rl_state}). Ngoài bốn đại lượng cảm biến/dự báo (nồng độ khí, nhiệt độ, độ ẩm và độ dốc \textit{slope} ước tính trên 30 mẫu cuối) cùng đặc trưng ghép tầng $p_{5\min}$ lấy từ LSTM, trạng thái còn chứa hai cờ nội bộ của bộ điều khiển (\texttt{fan\_on}, \texttt{valve\_closed}) và thời gian kể từ hành động cuối $\Delta t_{\mathrm{act}}$. Hai cờ nội bộ cho phép policy biết các can thiệp đã được kích hoạt để tránh lặp lại không cần thiết.
+
+\begin{table}[H]
+\centering
+\caption{Không gian trạng thái: vector quan sát 8 chiều của \texttt{GasLeakEnv}}
+\label{tab:rl_state}
+\begin{tabular}{clp{6.6cm}}
+\toprule
+\textbf{\#} & \textbf{Thành phần} & \textbf{Ý nghĩa (đã chuẩn hoá về $[0,1]$)} \\
+\midrule
+1 & \texttt{gas\_norm}      & Nồng độ khí $/\,2000$ \\
+2 & \texttt{temp\_norm}     & Nhiệt độ $/\,60$ \\
+3 & \texttt{hum\_norm}      & Độ ẩm $/\,100$ \\
+4 & \texttt{slope\_norm}    & Độ dốc 30 mẫu cuối, ánh xạ $[-10,10]\!\to\![0,1]$ \\
+5 & $p_{5\min}$             & Xác suất nguy hiểm 5 phút (đầu ra LSTM) \\
+6 & \texttt{fan\_on}        & Cờ quạt đang bật $\{0,1\}$ \\
+7 & \texttt{valve\_closed}  & Cờ van đang đóng $\{0,1\}$ \\
+8 & $\Delta t_{\mathrm{act}}$ & Thời gian từ hành động cuối $/\,300$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Không gian hành động (Action space)}
+
+Không gian hành động là tập \textbf{rời rạc} gồm 4 hành động (\texttt{Discrete(4)}); mỗi bước thời gian agent chọn đúng một hành động (Bảng~\ref{tab:rl_action}). Bốn hành động có \emph{chi phí} và \emph{tác động vật lý} rất khác nhau: ALERT rẻ và không làm thay đổi quỹ đạo khí; FAN làm khí giảm chậm ($\sim$1,5\%/giây); còn CLOSE\_VALVE chặn hẳn nguồn rò rỉ nhưng đồng thời cắt nguồn cung khí của hộ gia đình nếu kích hoạt sai lúc. Chính sự bất đối xứng về chi phí này là lý do bài toán cần học bằng RL thay vì một ngưỡng cứng.
+
+\begin{table}[H]
+\centering
+\caption{Không gian hành động: 4 hành động rời rạc của \texttt{GasLeakEnv}}
+\label{tab:rl_action}
+\begin{tabular}{cll}
+\toprule
+\textbf{Mã} & \textbf{Hành động} & \textbf{Tác động vật lý / chi phí} \\
+\midrule
+0 & \texttt{NO\_OP}       & Không làm gì (chỉ chịu step cost) \\
+1 & \texttt{ALERT\_USER} & Gửi cảnh báo -- rẻ, không tác động vật lý \\
+2 & \texttt{FAN\_ON}     & Bật quạt thông gió -- khí giảm $\sim$1,5\%/giây \\
+3 & \texttt{CLOSE\_VALVE}& Đóng van gas -- chặn hẳn nguồn rò rỉ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Hàm phần thưởng (Reward)}
 
 \textbf{Hàm reward} được thiết kế theo nguyên tắc \textit{asymmetric cost} kết hợp \textit{outcome-based}: hậu quả của việc bỏ sót rò rỉ (gas vượt ngưỡng nguy hiểm) phải nặng hơn rất nhiều so với cảnh báo sai, và phần thưởng tích cực được trao \emph{theo kết quả} (giữ được khí dưới ngưỡng) thay vì theo hành động:
 \begin{table}[H]
