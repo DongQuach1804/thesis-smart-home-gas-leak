@@ -395,11 +395,11 @@ Ba thay đổi then chốt so với phiên bản đầu: (i) \textbf{bỏ phần
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.85\linewidth]{exp/ppo_reward.png}
-  \caption{Đường cong reward (đã chuẩn hoá qua VecNormalize) của PPO trên \texttt{GasLeakEnv} qua 400{,}000 timesteps (4 môi trường song song). Đường mờ là reward thô từng episode; đường đậm là moving average.}
+  \caption{Đường cong reward huấn luyện PPO trên \texttt{GasLeakEnv} qua 400.000 timesteps (4 môi trường song song). Các thành phần của biểu đồ: \emph{chấm mờ} là reward thô của từng episode (gộp cả 4 môi trường); \emph{dải xanh nhạt} là khoảng $\pm 1$ độ lệch chuẩn giữa 4 môi trường tại mỗi mốc timesteps; \emph{đường xanh đậm} là reward trung bình đã làm mượt; \emph{đường gạch xanh lá} đánh dấu mức hội tụ ($\approx -100$). Trục hoành là tổng số timesteps huấn luyện, trục tung là tổng reward mỗi episode (giá trị thô ghi bởi Monitor, chưa qua chuẩn hoá).}
   \label{fig:ppo_reward}
 \end{figure}
 
-Khác hẳn phiên bản đầu (reward kẹt ở dải $[-2000, -1800]$, khó diễn giải), đường cong thể hiện \textbf{hội tụ rõ ràng}: reward trung bình tăng từ $\sim$$-22{,}000$ (giai đoạn khám phá ngẫu nhiên ban đầu, agent để khí vượt ngưỡng liên tục) lên dải $\sim$$-350$ ở cuối huấn luyện, với nhiều episode đạt $\sim$$-100$. Việc bỏ phần thưởng farm và chuẩn hoá reward bằng VecNormalize đã làm đường cong \emph{diễn giải được} và phản ánh đúng quá trình policy học cách kiềm chế rò rỉ với chi phí cảnh báo sai thấp. Thời gian huấn luyện trên CPU Colab khoảng 6--9 phút cho 400{,}000 timesteps.
+Khác hẳn phiên bản đầu (reward kẹt ở dải $[-2000, -1800]$, khó diễn giải), đường cong thể hiện \textbf{hội tụ rõ ràng}: reward trung bình tăng từ $\sim$$-22{,}000$ (giai đoạn khám phá ngẫu nhiên ban đầu, agent để khí vượt ngưỡng liên tục) lên vùng $\sim$$-100$ đến $-350$ ở cuối huấn luyện, trong đó đường trung bình đã làm mượt hội tụ ổn định quanh mức $\sim$$-100$. Việc bỏ phần thưởng farm và chuẩn hoá reward bằng VecNormalize đã làm đường cong \emph{diễn giải được} và phản ánh đúng quá trình policy học cách kiềm chế rò rỉ với chi phí cảnh báo sai thấp. Thời gian huấn luyện trên CPU Colab khoảng 6--9 phút cho 400{,}000 timesteps.
 
 \subsection{Cơ chế fallback rule-based}
 
@@ -434,7 +434,7 @@ Seed cố định     & 42 & 42 \\
 Hyper-parameters & Adam(lr=$10^{-3}$), epochs=20, batch=128, class\_weight pos$\approx$2{,}65 & $\gamma=0{,}99$, $\lambda_{\mathrm{GAE}}=0{,}95$, clip $\epsilon=0{,}2$, lr=$3\times10^{-4}$, ent\_coef=$0{,}01$, n\_steps=512, batch=128, VecNormalize \\
 Hàm mất mát      & Weighted binary cross-entropy & PPO clipped objective + value loss + entropy bonus \\
 Thời gian train (CPU) & $\sim$50--90\,s & $\sim$6--9\,phút \\
-Chỉ số đánh giá  & Acc 90{,}51\%, Prec 100\%, Recall 55{,}15\%, F1 71{,}09\% (sim); Acc 96{,}36\%, Recall 92{,}83\% (Kaggle thực) & Reward hội tụ $-22{,}000 \to -350$; benchmark: miss 5\%, peak 222\,ppm, alarm 1{,}1/giờ \\
+Chỉ số đánh giá  & Acc 90{,}51\%, Prec 100\%, Recall 55{,}15\%, F1 71{,}09\% (sim); Acc 96{,}36\%, Recall 92{,}83\% (Kaggle thực) & Reward hội tụ $-22{,}000 \to \sim-100$ (đường TB làm mượt); benchmark: miss 5\%, peak 222\,ppm, alarm 1{,}1/giờ \\
 File model       & \texttt{processing/ml/lstm/gas\_forecaster.keras} & \texttt{processing/ml/rl/ppo\_gas\_agent.zip} \\
 \bottomrule
 \end{tabular}
