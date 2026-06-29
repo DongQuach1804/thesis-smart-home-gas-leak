@@ -1,0 +1,56 @@
+% ============================================================
+%  Chương 5: Kết luận và hướng phát triển
+% ============================================================
+
+Chương này tổng hợp các kết quả đã đạt được, chỉ ra những hạn chế còn tồn tại và đề xuất hướng phát triển tiếp theo. Các kết luận được đặt trong phạm vi mô phỏng và kiểm thử phần mềm đã trình bày ở Chương~\ref{c:thucnghiemdanhgia}; hệ thống chưa được xem là một sản phẩm an toàn hoàn chỉnh nếu chưa kiểm thử với phần cứng và điều kiện khí gas thực tế.
+
+\section{Kết luận}
+
+Khóa luận này đã trình bày việc thiết kế, triển khai và đánh giá một nền tảng IoT 4 lớp cho phát hiện và ứng phó rò rỉ khí gas. So với hướng cảnh báo bằng ngưỡng tĩnh, đề tài đạt được một số kết quả chính sau:
+
+\subsection{Những kết quả đạt được}
+
+\begin{enumerate}
+  \item Mô hình LSTM dự báo: Chuyển từ bài toán gán nhãn trạng thái hiện tại sang bài toán dự báo xác suất rủi ro trong 5 phút tới. Mô hình được huấn luyện trên dữ liệu tổng hợp từ bộ mô phỏng và được kiểm chứng bổ sung trên dữ liệu cảm biến IoT công khai từ Kaggle (Accuracy 96{,}4\%, Recall 92{,}8\%). Kết quả này mới dừng ở mức tham khảo vì nhãn trên dữ liệu thực là nhãn proxy, nhưng giúp nhóm có thêm cơ sở để đánh giá khả năng học xu hướng tín hiệu của kiến trúc LSTM ngoài dữ liệu mô phỏng. Cơ chế dự phòng bằng ngoại suy xu hướng cũng được thêm vào để hệ thống vẫn có dự báo cơ bản khi chưa tải được mô hình.
+
+  \item Bộ điều khiển PPO: Học chính sách trong môi trường Gymnasium tích hợp bộ mô phỏng, với khả năng lựa chọn bốn hành động (NO\_OP/ALERT/FAN\_ON/CLOSE\_VALVE). Với hàm thưởng dựa trên kết quả kiềm chế khí (đã loại bỏ hiện tượng khai thác sai hàm thưởng của phiên bản đầu), bộ điều khiển PPO cho kết quả tốt trong đánh giá so sánh mô phỏng: tỷ lệ bỏ sót 5\% (luật tay 27\%, ngưỡng tĩnh 96\%), nồng độ đỉnh trung bình 222\,ppm (đường cơ sở 1{,}508\,ppm), và số cảnh báo sai 1{,}1/giờ. Điểm đáng chú ý là chính sách được học từ tương tác với môi trường thay vì viết sẵn toàn bộ bằng các ngưỡng if--else.
+
+  \item Luồng xử lý dữ liệu: Kiến trúc MQTT $\rightarrow$ Kafka $\rightarrow$ Spark cho phép xử lý dữ liệu cảm biến gần thời gian thực với độ trễ đầu cuối dưới 350 ms trong cấu hình thử nghiệm, đồng thời vẫn có hướng mở rộng khi số thiết bị tăng.
+
+  \item Tích hợp Telegram chatbot: Cung cấp kênh cảnh báo đẩy, truy vấn trạng thái và quản lý đăng ký nhận thông báo mà không cần cài ứng dụng riêng.
+
+  \item Phương pháp đánh giá: Định nghĩa \texttt{miss} theo \emph{kết quả} (khí có thực sự chạm 1000\,ppm hay không), phù hợp cho cả bộ điều khiển chỉ cảnh báo và bộ điều khiển có làm thay đổi quỹ đạo vật lý. Ngoài ra, đề tài bổ sung đường cơ sở luật tay (\texttt{RULE}) để so sánh với PPO trên các chỉ số thời gian cảnh báo trước, tỷ lệ bỏ sót, nồng độ khí đỉnh và cảnh báo sai.
+
+  \item Triển khai Docker Compose: Toàn bộ hệ thống 10 dịch vụ có thể khởi động bằng một lệnh duy nhất, giúp việc demo và kiểm tra lại kết quả thuận tiện hơn.
+\end{enumerate}
+
+\subsection{Hạn chế}
+
+\begin{itemize}
+  \item Kết quả chính vẫn dựa trên dữ liệu mô phỏng: Khi chưa có phần cứng và dữ liệu thực đầy đủ, dữ liệu mô phỏng là nguồn dữ liệu chính. Vì vậy, nếu mô phỏng còn đơn giản thì mô hình học được cũng khó phản ánh đầy đủ các đặc tính như nhiễu cảm biến, trôi tín hiệu, vị trí đặt cảm biến và điều kiện thông gió thật.
+
+  \item Dữ liệu Kaggle chỉ có nhãn proxy: Tập dữ liệu cảm biến IoT công khai không cung cấp nhãn rò rỉ LPG thật, nên nhãn dương được xây dựng theo phân vị cao của tín hiệu LPG. Vì vậy, kết quả trên Kaggle chỉ chứng minh sơ bộ khả năng học xu hướng tín hiệu, chưa chứng minh độ an toàn trong môi trường gas thực.
+
+  \item Bộ điều khiển PPO chưa được kiểm thử trên phần cứng: Agent hiện học trong môi trường mô phỏng, nơi hành động đóng van hoặc bật quạt có tác động lý tưởng hóa. Khi triển khai thực, cần kiểm tra độ trễ cơ cấu chấp hành, sai số cảm biến và các ràng buộc an toàn vật lý.
+
+  \item Số seed và kịch bản benchmark còn hạn chế: Benchmark hiện đã so sánh bốn bộ điều khiển và hai kịch bản rò rỉ chậm/rò rỉ nhanh, nhưng vẫn cần nhiều seed, nhiều cấu hình phòng và nhiều kiểu nhiễu hơn để kết luận chắc hơn về độ ổn định của chính sách.
+
+\end{itemize}
+
+\section{Hướng phát triển}
+
+Đề tài có thể được phát triển theo các hướng sau:
+
+\begin{itemize}
+  \item \textbf{Triển khai và kiểm thử trên phần cứng thực:} Thay thế bộ mô phỏng bằng ESP32 kết hợp cảm biến MQ và DHT22 trong môi trường phòng thí nghiệm có kiểm soát. Hướng này giúp đánh giá hệ thống trên dữ liệu cảm biến thực, bao gồm nhiễu, độ trôi tín hiệu và độ trễ khi vận hành.
+
+  \item \textbf{Cải thiện mô hình dự báo và điều khiển:} Thử nghiệm các mô hình chuỗi thời gian nâng cao hơn như Transformer-based time series hoặc Temporal Fusion Transformer để so sánh với LSTM. Đồng thời, tinh chỉnh PPO trên dữ liệu thực nhằm giảm khoảng cách giữa mô phỏng và triển khai thực tế.
+
+  \item \textbf{Mở rộng khả năng ứng dụng:} Hỗ trợ nhiều thiết bị cảm biến trong cùng không gian để phát hiện vị trí rò rỉ, kết hợp thêm cảm biến đa loại hoặc camera hồng ngoại để nhận diện loại khí và dấu hiệu cháy, hướng đến chuẩn hóa hệ thống cho môi trường dân dụng hoặc công nghiệp.
+\end{itemize}
+
+\section{Tổng kết}
+
+Đề tài đã xây dựng được một nguyên mẫu có thể chạy lại để khảo sát việc áp dụng LSTM và PPO vào bài toán phát hiện, ứng phó rò rỉ khí gas. Kiến trúc 4 lớp kết hợp bộ mô phỏng, Docker Compose, Telegram bot và bảng điều khiển thời gian thực.
+
+Trong benchmark mô phỏng hiện tại, cách tiếp cận kết hợp LSTM + PPO đạt kết quả tốt hơn ngưỡng tĩnh và luật tay trên các chỉ số được đo (bỏ sót 5\% so với 27--96\%, peak gas 222\,ppm so với tối đa 1{,}508\,ppm). Tuy nhiên, đây vẫn là kết quả trên môi trường mô phỏng. Để có thể kết luận chắc hơn về triển khai an toàn, hệ thống cần được kiểm thử tiếp với nhiều seed, nhiều kịch bản và phần cứng cảm biến thực.
