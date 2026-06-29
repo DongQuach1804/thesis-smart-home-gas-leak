@@ -78,7 +78,7 @@ class LSTMInference:
         if model_path is None:
             model_path = os.getenv(
                 "LSTM_MODEL_PATH",
-                "/app/ml/lstm/best_lstm_uci.keras",
+                "/app/ml/lstm/gas_forecaster.keras",
             )
         path = Path(model_path)
         # Check path BEFORE importing TF so stub tests work without TF installed
