@@ -1,0 +1,10 @@
+Benchmark (FIXED v3): 3 seeds x 4h. miss = leak where gas actually reached 1000 ppm.
+
+controller           miss%      alarm/hr        peak_gas   leaks
+THRESHOLD      96.0+-5.0      2.8+-1.0     1508.4+-88.2        8
+FORECASTER     96.0+-5.0      6.2+-1.9     1508.4+-88.2        8
+RULE           27.0+-14.0     4.9+-1.2      766.9+-217.3       9
+RL              5.0+-4.0      1.1+-0.4      221.8+-10.7       11
+
+Note: threshold/forecaster only ALERT (no physical action) -> gas reaches critical ~96% -> high miss.
+rule and rl act physically (fan/valve). rl (PPO v3) dominates on miss, alarm and peak.
