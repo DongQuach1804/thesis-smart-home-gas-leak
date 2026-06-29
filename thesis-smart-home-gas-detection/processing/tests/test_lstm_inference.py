@@ -17,7 +17,7 @@ if str(PROCESSING_ROOT) not in sys.path:
 
 import pytest
 
-MODEL_PATH = PROCESSING_ROOT / "ml" / "lstm" / "best_lstm_uci.keras"
+MODEL_PATH = PROCESSING_ROOT / "ml" / "lstm" / "gas_forecaster.keras"
 
 # Check TensorFlow availability once at collection time
 _TF_AVAILABLE = importlib.util.find_spec("tensorflow") is not None
@@ -25,7 +25,7 @@ _TF_AVAILABLE = importlib.util.find_spec("tensorflow") is not None
 
 @pytest.mark.skipif(
     not MODEL_PATH.exists(),
-    reason="Model file not present — place best_lstm_uci.keras in processing/ml/lstm/"
+    reason="Model file not present — place gas_forecaster.keras in processing/ml/lstm/"
 )
 @pytest.mark.skipif(
     not _TF_AVAILABLE,
