@@ -259,7 +259,7 @@ def _get_lstm():
         _ensure_path()
         try:
             from ml.inference.lstm_inference import LSTMInference
-            path = _env("LSTM_MODEL_PATH", "/app/ml/lstm/best_lstm_uci.keras")
+            path = _env("LSTM_MODEL_PATH", "/app/ml/lstm/gas_forecaster.keras")
             _lstm_inference = LSTMInference(path)
             logger.info("Legacy LSTM loaded from %s", path)
         except Exception as exc:  # noqa: BLE001
