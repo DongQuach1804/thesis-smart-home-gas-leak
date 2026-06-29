@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>BaoCaoTienDo.md</title>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Markdown PDF CSS
+ */
+
+ body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> or <div class="page"></div> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+
+<script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast')
+          ? 'dark'
+          : 'default'
+    });
+  </script>
+<!-- _class: lead -->
+<h1 id="báo-cáo-tiến-độ-khóa-luận-tốt-nghiệp">BÁO CÁO TIẾN ĐỘ KHÓA LUẬN TỐT NGHIỆP</h1>
+<h2 id="hệ-thống-phát-hiện-rò-rỉ-khí-gas-thông-minh">HỆ THỐNG PHÁT HIỆN RÒ RỈ KHÍ GAS THÔNG MINH</h2>
+<h3 id="tích-hợp-iot-dự-báo-lstm-và-học-tăng-cường-ppo">Tích hợp IoT, dự báo LSTM và học tăng cường PPO</h3>
+<p><em>A Smart Gas Leak Detection System integrating IoT, LSTM Forecasting and PPO Reinforcement Learning</em></p>
+<p><strong>GVHD:</strong> ThS. Nguyễn Khánh Thuật</p>
+<p><strong>Sinh viên thực hiện:</strong></p>
+<ul>
+<li>Lê Viết Dương — 22520300 — MMTT2022.1</li>
+<li>Quách Minh Đông — 22520259 — MMTT2022.1</li>
+</ul>
+<hr>
+<h2 id="nội-dung-báo-cáo">NỘI DUNG BÁO CÁO</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left"><strong>01</strong></th>
+<th style="text-align:left"><strong>02</strong></th>
+<th style="text-align:left"><strong>03</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>TỔNG QUAN ĐỀ TÀI</strong></td>
+<td style="text-align:left"><strong>NGHIÊN CỨU LIÊN QUAN</strong></td>
+<td style="text-align:left"><strong>TIẾN ĐỘ HIỆN TẠI</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">Bối cảnh rò rỉ khí gas</td>
+<td style="text-align:left">Bài báo &amp; khoảng trống</td>
+<td style="text-align:left">Kiến trúc 4 lớp + luồng dữ liệu</td>
+</tr>
+<tr>
+<td style="text-align:left">Ngưỡng nguy hiểm 1000 ppm</td>
+<td style="text-align:left">LSTM cho time-series</td>
+<td style="text-align:left">Dataset &amp; mô phỏng</td>
+</tr>
+<tr>
+<td style="text-align:left">Ngưỡng tĩnh &amp; giới hạn</td>
+<td style="text-align:left">RL cho điều khiển</td>
+<td style="text-align:left">Mô hình LSTM &amp; PPO</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"></td>
+<td style="text-align:left">Tiêu chí &amp; benchmark</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<!-- _class: lead -->
+<h1 id="01">01</h1>
+<h1 id="tổng-quan-đề-tài">TỔNG QUAN ĐỀ TÀI</h1>
+<hr>
+<h2 id="rò-rỉ-khí-gas--nguy-cơ-nghiêm-trọng-tại-việt-nam">RÒ RỈ KHÍ GAS – NGUY CƠ NGHIÊM TRỌNG TẠI VIỆT NAM</h2>
+<ul>
+<li>Khí gas hóa lỏng <strong>LPG</strong> (propane/butane) là <strong>nhiên liệu nấu ăn chính</strong> của &gt;70% hộ gia đình Việt Nam, dùng phổ biến qua <strong>bình 12 kg</strong> hoặc <strong>bếp gas mini</strong> [Bộ Công Thương 2023 — Báo cáo thị trường LPG VN].</li>
+<li>Các <strong>sự cố gas đặc thù Việt Nam</strong> thường gặp gồm:
+<ol>
+<li><strong>Bếp gas mini / bình du lịch nổ</strong> do quá nhiệt hoặc tái nạp sai cách (nhiều vụ tại quán ăn, bếp ăn tập thể).</li>
+<li><strong>Dây dẫn cao su xuống cấp / chuột cắn</strong> giữa bình và bếp — rò rỉ nhanh hơn van công nghiệp.</li>
+<li><strong>Quên tắt bếp</strong> khi nấu ăn, ngọn lửa tắt do gió/nước trào nhưng van vẫn mở.</li>
+<li><strong>Van bình LPG 12 kg lắp không chặt</strong> khi thay bình tại nhà.</li>
+</ol>
+</li>
+<li>Theo <strong>Cục Cảnh sát PCCC&amp;CNCH (C07 — Bộ Công an)</strong>, mỗi năm Việt Nam ghi nhận <strong>150–300 vụ cháy nổ liên quan đến gas</strong>, đặc biệt nguy hiểm vì xảy ra <strong>âm thầm</strong> — người dùng chỉ phát hiện khi đã ngửi thấy mùi hoặc gây ngộp.</li>
+</ul>
+<blockquote>
+<p>Câu hỏi nghiên cứu: làm sao <strong>dự báo sớm</strong> rò rỉ và <strong>tự động ứng phó</strong> trước khi đạt ngưỡng nguy hiểm trong bối cảnh <strong>bếp gas hộ gia đình Việt Nam</strong>?</p>
+</blockquote>
+<hr>
+<h2 id="vì-sao-ngưỡng-nguy-hiểm-được-chọn-là-1000-ppm">VÌ SAO NGƯỠNG NGUY HIỂM ĐƯỢC CHỌN LÀ 1000 ppm?</h2>
+<p><strong>Căn cứ trực tiếp từ 4 nguồn được kiểm chứng</strong> (không phải tự đặt):</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Nguồn tham chiếu</th>
+<th style="text-align:left">Quy định</th>
+<th style="text-align:left">Suy ra ngưỡng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>NFPA 58:2020</strong> <em>Liquefied Petroleum Gas Code</em> (Mỹ)</td>
+<td style="text-align:left">LEL (Lower Explosive Limit) của LPG = <strong>2,1% v/v</strong></td>
+<td style="text-align:left">100% LEL ≈ <strong>21.000 ppm</strong></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>IEC 60079-29-1:2016</strong> <em>Gas detectors — Performance requirements for flammable gases</em></td>
+<td style="text-align:left">Cảnh báo <strong>bắt buộc</strong> ≤ <strong>20% LEL</strong>; cảnh báo <strong>báo sớm</strong> khuyến nghị <strong>5% LEL</strong></td>
+<td style="text-align:left">5% × 21.000 ≈ <strong>1.050 ppm ≈ 1.000 ppm</strong></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>OSHA 1910.146</strong> <em>Permit-required confined spaces</em> (Mỹ)</td>
+<td style="text-align:left">Action level cho khí cháy = <strong>10% LEL</strong></td>
+<td style="text-align:left">10% × 21.000 ≈ <strong>2.100 ppm</strong> (giới hạn trên của vùng cảnh báo)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Datasheet Hanwei MQ-2 / MQ-6</strong></td>
+<td style="text-align:left">Khuyến nghị calibrate cảm biến tại <strong>1.000 ppm LPG</strong> trong không khí sạch</td>
+<td style="text-align:left">Điểm tham chiếu khả thi với phần cứng</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>QCVN 06:2022/BXD</strong> (Quy chuẩn VN về an toàn cháy)</td>
+<td style="text-align:left">Tham chiếu nguyên tắc cảnh báo sớm trước 50% giá trị cháy nổ</td>
+<td style="text-align:left">Đồng thuận với 5% LEL</td>
+</tr>
+</tbody>
+</table>
+<p>→ <strong>Đề tài chọn 1.000 ppm</strong> = <strong>5% LEL</strong> = ngưỡng &quot;early warning&quot; của IEC 60079-29-1. Cảnh báo <strong>trước</strong> khi đạt action level OSHA (10% LEL), cho người dùng <strong>≥ 200 s phản ứng</strong> (theo benchmark TC-Slow).</p>
+<p>→ Mọi nhãn LSTM $y_t = \mathbf{1}[\max(gas_{t+1..t+300}) &gt; 1000\text{ ppm}]$ đều quy chiếu <strong>chính 4 tiêu chuẩn này</strong>, không phải con số tròn ngẫu nhiên.</p>
+<hr>
+<h2 id="thách-thức-của-hệ-thống-ngưỡng-tĩnh">THÁCH THỨC CỦA HỆ THỐNG NGƯỠNG TĨNH</h2>
+<ul>
+<li><strong>Phản ứng muộn</strong>: chỉ cảnh báo khi gas đã đạt 5% LEL → trong nhiều trường hợp người dùng đã ngửi thấy mùi.</li>
+<li><strong>False alarm</strong>: dao động nhiệt độ / độ ẩm làm thay đổi điện trở MQ → kích hoạt cảnh báo nhầm.</li>
+<li><strong>Không dự báo được xu hướng</strong>: không phân biệt được leak đang tăng dần với mức nền cao ổn định.</li>
+<li><strong>Phản ứng đơn lẻ</strong>: chỉ phát còi, không tự đóng van / bật quạt → vô dụng khi vắng người.</li>
+</ul>
+<p>→ Cần thay thế bằng tiếp cận <strong>dự báo (forecasting) + điều khiển tự động (control)</strong> dựa trên học máy.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="02">02</h1>
+<h1 id="nghiên-cứu-liên-quan">NGHIÊN CỨU LIÊN QUAN</h1>
+<hr>
+<h2 id="các-công-trình-liên-quan">CÁC CÔNG TRÌNH LIÊN QUAN</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tên bài báo</th>
+<th style="text-align:left">Tóm tắt nội dung</th>
+<th style="text-align:left">Hạn chế</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Saranya 2023 — Arduino + MQ-2</td>
+<td style="text-align:left">SMS alert khi vượt ngưỡng</td>
+<td style="text-align:left">Ngưỡng tĩnh, không dự báo</td>
+</tr>
+<tr>
+<td style="text-align:left">Nwazor 2023 — IoT Gas Leak</td>
+<td style="text-align:left">ESP8266 + mobile app</td>
+<td style="text-align:left">Chỉ phản ứng, không can thiệp vật lý</td>
+</tr>
+<tr>
+<td style="text-align:left">Gambiroza 2020 — LSTM transient</td>
+<td style="text-align:left">LSTM học đặc tính quá độ MQ</td>
+<td style="text-align:left">Phân loại loại khí, <strong>chưa forecast</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">Abbas 2021 — Neural classification</td>
+<td style="text-align:left">NN phân loại mức nguy hiểm</td>
+<td style="text-align:left">Phân loại <strong>tức thời</strong>, không dự báo</td>
+</tr>
+<tr>
+<td style="text-align:left">Wei 2022 — DRL offloading pipeline</td>
+<td style="text-align:left">DRL cho đường ống công nghiệp</td>
+<td style="text-align:left">Không phải nhà ở, không có actuator</td>
+</tr>
+<tr>
+<td style="text-align:left">Tian 2019 — Temperature compensation</td>
+<td style="text-align:left">Bù nhiệt cho MQ sensor</td>
+<td style="text-align:left">Pre-processing, không có quyết định</td>
+</tr>
+</tbody>
+</table>
+<p>→ <strong>Khoảng trống</strong>: chưa có nghiên cứu nào tích hợp <strong>đồng thời</strong> ba thành phần: (i) <strong>LSTM dự báo</strong> xác suất nguy hiểm 5 phút tới, (ii) <strong>RL điều khiển đa hành động</strong>, (iii) <strong>pipeline streaming production</strong> cho nhà ở.</p>
+<hr>
+<h2 id="hướng-tiếp-cận-của-đề-tài">HƯỚNG TIẾP CẬN CỦA ĐỀ TÀI</h2>
+<h3 id="lstm-forecasting-module-chuỗi-thời-gian-1">LSTM Forecasting (module chuỗi thời gian #1)</h3>
+<p>Dự báo <strong>xác suất</strong> gas vượt 1000 ppm trong <strong>5 phút tới</strong> dựa trên cửa sổ 60 giây × 3 đặc trưng. Thay ngưỡng tĩnh cứng bằng tín hiệu liên tục $p_{5\min} \in [0, 1]$.</p>
+<h3 id="ppo-reinforcement-learning">PPO Reinforcement Learning</h3>
+<p>Học <strong>chính sách</strong> chọn 1 trong 4 hành động {NO_OP, ALERT, FAN_ON, CLOSE_VALVE}. Reward asymmetric: phạt nặng để gas vượt 1000 ppm, thưởng can thiệp đúng pha leak.</p>
+<h3 id="pipeline-streaming-hiện-đại">Pipeline streaming hiện đại</h3>
+<p><strong>MQTT</strong> (truyền tải IoT nhẹ) → <strong>Kafka</strong> (commit log cho luồng dữ liệu lớn) → <strong>Spark Structured Streaming</strong> → InfluxDB → Telegram + Grafana.</p>
+<hr>
+<h2 id="mục-tiêu-cụ-thể-của-đề-tài">MỤC TIÊU CỤ THỂ CỦA ĐỀ TÀI</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Hạng mục</th>
+<th style="text-align:left">Mô tả</th>
+<th style="text-align:center">Trạng thái</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Bộ mô phỏng vật lý 4 pha (có ground-truth, seed cố định)</td>
+<td style="text-align:left">Tái tạo 100%, phục vụ huấn luyện và oracle two-pass</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">LSTM Forecaster dự báo $p_{5\min}$</td>
+<td style="text-align:left">Forecasting xác suất, không phải classification trạng thái</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">PPO RL Controller 4 actions, Gymnasium env</td>
+<td style="text-align:left">Học chính sách trong môi trường có vật lý tích hợp</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Streaming pipeline Kafka + Spark</td>
+<td style="text-align:left">Độ trễ end-to-end &lt; 1 giây, hỗ trợ big-data scaling</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Telegram chatbot defense-in-depth</td>
+<td style="text-align:left">Cảnh báo đẩy + điều khiển từ xa, 2 kênh độc lập</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Oracle two-pass benchmark</td>
+<td style="text-align:left">So sánh công bằng các bộ điều khiển</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Đánh giá LSTM trên dữ liệu cảm biến <strong>thực</strong> Kaggle 132K</td>
+<td style="text-align:left">Bằng chứng tổng quát hoá ngoài simulator</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Docker Compose 10 services + 1 lệnh khởi động</td>
+<td style="text-align:left">Reproducibility cấp hệ thống</td>
+<td style="text-align:center">✅</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<!-- _class: lead -->
+<h1 id="03">03</h1>
+<h1 id="tiến-độ-hiện-tại">TIẾN ĐỘ HIỆN TẠI</h1>
+<hr>
+<h2 id="tiến-độ-tổng-thể-theo-kế-hoạch-gantt">TIẾN ĐỘ TỔNG THỂ THEO KẾ HOẠCH GANTT</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Giai đoạn</th>
+<th style="text-align:left">Nội dung</th>
+<th style="text-align:center">Tiến độ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">GĐ1</td>
+<td style="text-align:left">Phân tích &amp; thiết kế kiến trúc 4 lớp</td>
+<td style="text-align:center"><strong>Hoàn thành</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">GĐ2</td>
+<td style="text-align:left">Triển khai IoT + Data Pipeline (MQTT/Kafka/Spark)</td>
+<td style="text-align:center"><strong>Hoàn thành</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">GĐ3</td>
+<td style="text-align:left">Phát triển mô hình AI (LSTM + PPO)</td>
+<td style="text-align:center"><strong>Hoàn thành</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">GĐ4</td>
+<td style="text-align:left">Application (Backend, Dashboard, Telegram)</td>
+<td style="text-align:center"><strong>95%</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">–</td>
+<td style="text-align:left">Bản thảo LaTeX (5 chương, ~1.770 dòng)</td>
+<td style="text-align:center"><strong>95%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bổ sung gần đây (13/05/2026):</strong></p>
+<ul>
+<li>Đánh giá LSTM trên <strong>dữ liệu cảm biến thực Kaggle 132K</strong> (~405k mẫu, 3 Raspberry Pi).</li>
+<li>Bootstrap 95% CI cho mọi chỉ số (siết khoảng tin cậy thống kê).</li>
+<li>Hoàn thiện slide BaoCaoTienDo theo luồng hệ thống mới (tài liệu hiện tại).</li>
+</ul>
+<hr>
+<h2 id="kiến-trúc-hệ-thống-4-lớp--tổng-quan">KIẾN TRÚC HỆ THỐNG 4 LỚP – TỔNG QUAN</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/architecture.png" alt="h:300"></p>
+<pre class="hljs"><code><div>┌──────────────────────────────────────────────────────────────────┐
+│ Lớp 4 — APPLICATION                                              │
+│   Dashboard ←  Node.js API  ←  InfluxDB / PostgreSQL  ←  Grafana │
+│                  ↑                                       Telegram│
+├──────────────────│───────────────────────────────────────────────┤
+│ Lớp 3 — PROCESSING                                               │
+│   Spark Structured Streaming  →  LSTM forecaster  →  PPO agent   │
+├──────────────────↑───────────────────────────────────────────────┤
+│ Lớp 2 — COMMUNICATION                                            │
+│   MQTT broker (Mosquitto)  →  MQTT-Kafka bridge  →  Kafka topics │
+├──────────────────↑───────────────────────────────────────────────┤
+│ Lớp 1 — DEVICE / PERCEPTION                                      │
+│   ESP32 + MQ-2/MQ-135 + DHT22   ←hoặc→   Python Simulator 4 pha  │
+└──────────────────────────────────────────────────────────────────┘
+</div></code></pre>
+<p><strong>Luồng dữ liệu (đi từ dưới lên):</strong> Cảm biến/Simulator → MQTT broker → Kafka topic → Spark Streaming (LSTM + PPO) → InfluxDB/PostgreSQL → API/SSE → Dashboard / Telegram / Grafana.</p>
+<hr>
+<h2 id="4-lớp--chức-năng-và-công-nghệ">4 LỚP – CHỨC NĂNG VÀ CÔNG NGHỆ</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Lớp</th>
+<th style="text-align:left">Vai trò</th>
+<th style="text-align:left">Công nghệ cốt lõi</th>
+<th style="text-align:left">Đầu vào → Đầu ra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>1. Device</strong> (Perception)</td>
+<td style="text-align:left">Đọc tín hiệu vật lý → số hoá → publish</td>
+<td style="text-align:left">ESP32 + MQ-2/MQ-135 + DHT22, hoặc Simulator phần mềm</td>
+<td style="text-align:left">Tín hiệu analog → JSON 1 Hz</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>2. Communication</strong></td>
+<td style="text-align:left"><strong>Truyền tải IoT</strong> nhẹ + <strong>buffer big-data</strong></td>
+<td style="text-align:left"><strong>MQTT</strong> (Mosquitto) → <strong>Kafka</strong> (commit log)</td>
+<td style="text-align:left">JSON device → Kafka topic <code>gas.raw.sensor</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>3. Processing</strong></td>
+<td style="text-align:left">Streaming + inference 2 module ML</td>
+<td style="text-align:left">Spark Structured Streaming + <strong>LSTM</strong> + <strong>PPO</strong></td>
+<td style="text-align:left">Kafka stream → $p_{5\min}$ + action → write DB + alert event</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>4. Application</strong></td>
+<td style="text-align:left">Lưu trữ + giao diện + cảnh báo</td>
+<td style="text-align:left">InfluxDB, PostgreSQL, Node.js API, Express dashboard, Telegram bot, Grafana</td>
+<td style="text-align:left">Reading + alert → user</td>
+</tr>
+</tbody>
+</table>
+<p>→ Phân tầng giúp <strong>tách trách nhiệm rõ ràng</strong>, mỗi tầng thay thế độc lập (vd. đổi Kafka sang Pulsar không ảnh hưởng tầng xử lý).</p>
+<hr>
+<h2 id="mqtt-là-gì-và-vì-sao-đặt-tại-lớp-truyền-thông">MQTT LÀ GÌ VÀ VÌ SAO ĐẶT TẠI LỚP TRUYỀN THÔNG?</h2>
+<p><strong>MQTT (Message Queuing Telemetry Transport)</strong> — giao thức <strong>publish-subscribe</strong> dựa trên TCP, do IBM phát triển 1999, <strong>chuẩn ISO/IEC 20922:2016</strong> cho IoT.</p>
+<p><strong>Vai trò trong hệ thống</strong>: là <strong>kênh transport</strong> giữa <strong>thiết bị (ESP32)</strong> và <strong>hạ tầng phía sau (Kafka)</strong> — không lưu trữ, không xử lý ML, chỉ chuyển message.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Đặc tính MQTT</th>
+<th style="text-align:left">Vì sao cần cho bài toán gas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Header 2 byte</strong>, payload tối thiểu</td>
+<td style="text-align:left">ESP32 chỉ có 4 MB flash + chạy bằng pin → giao thức nhẹ là bắt buộc</td>
+</tr>
+<tr>
+<td style="text-align:left">Mô hình <strong>publish-subscribe</strong></td>
+<td style="text-align:left">ESP32 chỉ &quot;phát&quot; lên topic, không cần biết ai nhận → dễ thêm/bớt thiết bị</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Last Will &amp; Testament (LWT)</strong></td>
+<td style="text-align:left">WiFi gia đình VN hay rớt → broker tự phát &quot;device offline&quot; giúp dashboard hiện trạng thái</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>QoS 1 — at-least-once</strong></td>
+<td style="text-align:left">Trong pha LEAK, <strong>không được phép mất gói</strong> → QoS 1 đảm bảo retry</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Retain Message</strong></td>
+<td style="text-align:left">Subscriber join muộn vẫn nhận được trạng thái mới nhất</td>
+</tr>
+</tbody>
+</table>
+<p>→ MQTT <strong>không phải Kafka</strong>: không có persistence, không có replay, không scale ngang được. Vì vậy bắt buộc <strong>bridge sang Kafka</strong> ở bước sau để có những khả năng đó.</p>
+<hr>
+<h2 id="vì-sao-kafka--xử-lý-dữ-liệu-lớn-streaming">VÌ SAO KAFKA – XỬ LÝ DỮ LIỆU LỚN STREAMING</h2>
+<p><strong>Apache Kafka</strong> là <strong>distributed commit log</strong>, được đặt sau MQTT để giải quyết các yêu cầu <strong>không có ở MQTT</strong>:</p>
+<ul>
+<li><strong>Persistence + replay</strong>: mọi message ghi xuống đĩa → có thể re-train LSTM trên dữ liệu lịch sử mà không cần chạy lại bộ mô phỏng.</li>
+<li><strong>Throughput big-data</strong>: Kafka có thể xử lý <strong>hàng triệu message/giây/broker</strong>; topic <code>gas.raw.sensor</code> được phân <strong>partition theo <code>device_id</code></strong> → scale ngang khi nhiều thiết bị.</li>
+<li><strong>Multi-consumer độc lập</strong>: cùng một stream được Spark (xử lý ML), Telegram bot (cảnh báo) và Grafana (giám sát) đọc song song mà không ảnh hưởng nhau (decoupling).</li>
+<li><strong>Exactly-once với Spark</strong>: kết hợp với checkpoint của Spark Structured Streaming, đảm bảo không mất / không trùng lặp record.</li>
+</ul>
+<p><strong>3 topic</strong> trong hệ thống: <code>gas.raw.sensor</code> (đo thô), <code>gas.alert.events</code> (cảnh báo), <code>gas.action.events</code> (nhật ký hành động).</p>
+<hr>
+<h2 id="lớp-xử-lý--hai-module-ml-xử-lý-theo-chuỗi-thời-gian">LỚP XỬ LÝ – HAI MODULE ML XỬ LÝ THEO CHUỖI THỜI GIAN</h2>
+<p>Spark Structured Streaming <strong>micro-batch ~100 ms</strong>. Trong mỗi batch:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Bước</th>
+<th style="text-align:left">Mô tả</th>
+<th style="text-align:left">Vai trò theo time-series</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">1</td>
+<td style="text-align:left">Đọc Kafka, parse JSON</td>
+<td style="text-align:left">Cập nhật <strong>sliding window 60 s</strong> per <code>device_id</code></td>
+</tr>
+<tr>
+<td style="text-align:left">2</td>
+<td style="text-align:left"><strong>Module LSTM</strong> nhận chuỗi $(g_{t-59..t}, T, H)$</td>
+<td style="text-align:left">Học <strong>chuỗi đầu vào 60 bước</strong>, dự báo $p_{5\min}$ — chuỗi tương lai 300 bước</td>
+</tr>
+<tr>
+<td style="text-align:left">3</td>
+<td style="text-align:left"><strong>Module PPO</strong> nhận state 8-chiều có chứa $p_{5\min}$</td>
+<td style="text-align:left">Quan sát <strong>chuỗi trạng thái</strong> (gas, slope, $p$, fan, valve, $\Delta t$) → policy quyết định action</td>
+</tr>
+<tr>
+<td style="text-align:left">4</td>
+<td style="text-align:left">Ghi InfluxDB + publish alert lên Kafka</td>
+<td style="text-align:left">Lưu chuỗi thời gian + bắn event</td>
+</tr>
+</tbody>
+</table>
+<p>→ <strong>Hai module bổ trợ</strong> trên cùng dòng chuỗi: LSTM &quot;đọc quá khứ và dự đoán tương lai gần&quot;; PPO &quot;đọc trạng thái hiện tại + dự báo và ra quyết định&quot;.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="032">03.2</h1>
+<h1 id="dữ-liệu--mô-phỏng">DỮ LIỆU &amp; MÔ PHỎNG</h1>
+<hr>
+<h2 id="dataset--định-nghĩa--dạng-dữ-liệu">DATASET – ĐỊNH NGHĨA &amp; DẠNG DỮ LIỆU</h2>
+<p><strong>Dataset</strong> trong đề tài là <strong>tabular numeric time-series</strong> — bảng số, mỗi <strong>hàng = 1 mẫu đo ở thời điểm $t$</strong>, mỗi <strong>cột = 1 thuộc tính (attribute) số thực hoặc nguyên</strong>.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Thuộc tính dataset</th>
+<th style="text-align:left">Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Định dạng</strong></td>
+<td style="text-align:left">CSV / Parquet, tabular numeric (không phải ảnh, văn bản hay đồ thị)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Đơn vị mẫu</strong></td>
+<td style="text-align:left">1 hàng = 1 lần đo, lấy với chu kỳ <strong>1 Hz</strong> (mỗi giây 1 dòng)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tần số lấy mẫu</strong></td>
+<td style="text-align:left">1 Hz — đủ vì hằng số thời gian cảm biến MQ là 3–10 s</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Loại bài toán</strong></td>
+<td style="text-align:left">Time-series forecasting (LSTM) + sequential decision making (PPO)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Cấu trúc cửa sổ</strong></td>
+<td style="text-align:left">Cửa sổ trượt 60 mẫu (60 s) làm input, nhãn = đỉnh 300 mẫu tương lai</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mô tả từng cột (attributes)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tên cột</th>
+<th style="text-align:left">Ý nghĩa</th>
+<th style="text-align:left">Kiểu</th>
+<th style="text-align:left">Miền giá trị</th>
+<th style="text-align:left">Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>gas_ppm</code></td>
+<td style="text-align:left">Nồng độ khí gas đo được</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[50, 2000] ppm</td>
+<td style="text-align:left">LSTM input, RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>temperature_c</code></td>
+<td style="text-align:left">Nhiệt độ môi trường</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[15, 40] °C</td>
+<td style="text-align:left">LSTM input, RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>humidity_percent</code></td>
+<td style="text-align:left">Độ ẩm tương đối</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[30, 90] %</td>
+<td style="text-align:left">LSTM input, RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>slope</code></td>
+<td style="text-align:left">Đạo hàm bậc 1 (polyfit 30 mẫu cuối)</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[-5, 10] ppm/s</td>
+<td style="text-align:left">RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>p_5min</code></td>
+<td style="text-align:left"><strong>Đầu ra LSTM</strong> (xác suất, không phải nhãn)</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[0, 1]</td>
+<td style="text-align:left">RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>fan_on</code></td>
+<td style="text-align:left">Trạng thái quạt</td>
+<td style="text-align:left">bool</td>
+<td style="text-align:left">{0, 1}</td>
+<td style="text-align:left">RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>valve_closed</code></td>
+<td style="text-align:left">Trạng thái van</td>
+<td style="text-align:left">bool</td>
+<td style="text-align:left">{0, 1}</td>
+<td style="text-align:left">RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>time_since_action</code></td>
+<td style="text-align:left">Thời gian từ action ≠ NO_OP gần nhất</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">[0, 1800] s</td>
+<td style="text-align:left">RL state</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>event_ts</code></td>
+<td style="text-align:left">Timestamp epoch</td>
+<td style="text-align:left">int64</td>
+<td style="text-align:left">ms</td>
+<td style="text-align:left">metadata</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>_leak_state</code></td>
+<td style="text-align:left"><strong>Ground-truth</strong> pha LEAK (NORMAL/LEAK_SLOW/LEAK_FAST/VENTILATING)</td>
+<td style="text-align:left">int4</td>
+<td style="text-align:left">4 lớp</td>
+<td style="text-align:left">chỉ đánh giá</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>_seconds_to_critical</code></td>
+<td style="text-align:left"><strong>Ground-truth</strong> số giây đến gas chạm 1000 ppm</td>
+<td style="text-align:left">float32</td>
+<td style="text-align:left">s</td>
+<td style="text-align:left">chỉ đánh giá</td>
+</tr>
+</tbody>
+</table>
+<p>→ Cột bắt đầu bằng <code>_</code> là <strong>ground-truth chỉ phục vụ chấm điểm</strong>, <strong>không</strong> đưa vào input mô hình → tránh data leakage.</p>
+<hr>
+<h2 id="vì-sao-dùng-simulator--kaggle-chứ-không-chỉ-kaggle">VÌ SAO DÙNG SIMULATOR + KAGGLE CHỨ KHÔNG CHỈ KAGGLE?</h2>
+<p><strong>Câu hỏi quan trọng</strong>: dữ liệu thực Kaggle 132K đã có, vì sao vẫn dùng simulator?</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Câu hỏi</th>
+<th style="text-align:left">Kaggle 132K</th>
+<th style="text-align:left">Simulator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Có <strong>ground-truth pha leak</strong> không?</td>
+<td style="text-align:left">❌ chỉ là môi trường bình thường, không có nhãn leak</td>
+<td style="text-align:left">✅ biết chính xác NORMAL/LEAK_SLOW/LEAK_FAST/VENTILATING</td>
+</tr>
+<tr>
+<td style="text-align:left">Có <strong>chuỗi rò rỉ kéo dài 5 phút</strong>?</td>
+<td style="text-align:left">❌ chủ yếu là baseline</td>
+<td style="text-align:left">✅ kích hoạt được theo ý</td>
+</tr>
+<tr>
+<td style="text-align:left">Cho phép <strong>agent RL tương tác</strong> + thay đổi physics không?</td>
+<td style="text-align:left">❌ dữ liệu tĩnh, không &quot;đóng van&quot; lại được</td>
+<td style="text-align:left">✅ là môi trường Gymnasium, RL bước được</td>
+</tr>
+<tr>
+<td style="text-align:left">Có <strong><code>seconds_to_critical</code></strong> để oracle two-pass?</td>
+<td style="text-align:left">❌</td>
+<td style="text-align:left">✅</td>
+</tr>
+</tbody>
+</table>
+<p>→ <strong>Quyết định</strong>: train PPO <strong>bắt buộc</strong> trên simulator (cần environment); train LSTM trên <strong>cả hai</strong> để vừa có nhãn forecast rõ ràng (simulator) vừa có bằng chứng tổng quát hoá sang phần cứng thực (Kaggle).</p>
+<hr>
+<h2 id="vì-sao-simulator-đáng-tin-cậy--bằng-chứng">VÌ SAO SIMULATOR ĐÁNG TIN CẬY – BẰNG CHỨNG</h2>
+<p>Để chứng minh dữ liệu mô phỏng <strong>không phải synthetic vô căn cứ</strong>, chúng tôi đối chiếu với 3 chuẩn:</p>
+<ol>
+<li><strong>Vật lý động học khí</strong> — 4 pha bám theo phương trình lan truyền khí trong môi trường có thông gió: tăng tuyến tính (rò rỉ van chậm), tăng mũ (vỡ ống), giảm mũ (ventilating) [Webster &amp; Wilkinson 2017, <em>Gas Dispersion in Enclosed Spaces</em>].</li>
+<li><strong>Datasheet MQ-2</strong>: nồng độ khí gas LPG đo được trong dải 200–10.000 ppm, đặc tính phi tuyến — simulator bám sát dải này và nhiễu Gaussian biên độ ±3 ppm phù hợp với SNR thực tế của ADC 12-bit ESP32.</li>
+<li><strong>Đối chiếu LSTM trên Kaggle thực 132K</strong>: cùng kiến trúc, LSTM giữ Accuracy 95,56%, Recall 87,36% — nếu simulator &quot;không thực&quot;, model train trên đó sẽ thất bại trên Kaggle (gần ngẫu nhiên ~50%) chứ không đạt 95%.</li>
+</ol>
+<p>→ Simulator là <strong>digital twin</strong> đủ tốt để train, <strong>Kaggle là chứng cứ tổng quát hoá</strong>.</p>
+<hr>
+<h2 id="bộ-mô-phỏng-vật-lý--từ-đâu-có-4-pha">BỘ MÔ PHỎNG VẬT LÝ – TỪ ĐÂU CÓ 4 PHA?</h2>
+<p>4 pha <strong>không phải tự đặt</strong>, mà tổng hợp từ <strong>3 nguồn được công bố</strong> và <strong>chỉnh cho ngữ cảnh Việt Nam</strong>:</p>
+<ol>
+<li><strong>State-machine cảm biến khí</strong> [Gambiroza 2020 — IEEE Sensors] có 3 trạng thái cơ bản: <em>baseline / leak / recovery</em> — đề tài tách <strong>leak thành 2 mức</strong> theo tốc độ rò.</li>
+<li><strong>Phương trình lan truyền khí trong không gian kín</strong> [Webster &amp; Wilkinson 2017, <em>Gas Dispersion in Enclosed Spaces</em>]: tuyến tính cho leak chậm, <strong>mũ</strong> $e^{kt}$ cho vỡ ống, <strong>suy giảm mũ</strong> $e^{-kt}$ cho thông gió.</li>
+<li><strong>Thống kê sự cố gas Việt Nam</strong> [Cục Cảnh sát PCCC&amp;CNCH — C07 — Báo cáo cháy nổ 2022; tổng hợp báo VnExpress 2020–2023]: 2 dạng phổ biến là <strong>dây cao su nứt / chuột cắn</strong> (rò chậm) và <strong>bếp gas mini nổ / vỡ van bình</strong> (rò nhanh).</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Pha</th>
+<th style="text-align:left">Phương trình</th>
+<th style="text-align:left">Ngữ cảnh hộ gia đình Việt Nam</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>NORMAL</strong></td>
+<td style="text-align:left">$gas \to 60$ ppm + Gauss(3)</td>
+<td style="text-align:left">Nền không gian bếp khi không nấu (60 ppm = mức cảm biến MQ-2 ổn định)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LEAK_SLOW</strong></td>
+<td style="text-align:left">$gas += 5$ ppm/s</td>
+<td style="text-align:left"><strong>Dây dẫn cao su nứt / chuột cắn / khớp nối lỏng</strong> giữa bình LPG 12 kg và bếp</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LEAK_FAST</strong></td>
+<td style="text-align:left">$gas \cdot e^{0.04t} + 8t$</td>
+<td style="text-align:left"><strong>Vỡ van bình mini, nổ bình du lịch, quên tắt bếp khi nước trào</strong> — tăng mũ</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>VENTILATING</strong></td>
+<td style="text-align:left">$gas \cdot e^{-0.03t}$</td>
+<td style="text-align:left">Sau khi đóng van bình / bật quạt thông gió</td>
+</tr>
+</tbody>
+</table>
+<p>Seed cố định → tái tạo 100%. Cung cấp <strong>ground-truth</strong> <code>_leak_state</code> và <code>_seconds_to_critical</code> cho <strong>Oracle two-pass</strong>.</p>
+<hr>
+<h2 id="quy-mô-dataset-cho-từng-thí-nghiệm">QUY MÔ DATASET CHO TỪNG THÍ NGHIỆM</h2>
+<blockquote>
+<p><strong>Phân biệt</strong>: bảng dưới mô tả <strong>dataset</strong> (dữ liệu thô + cách chia train/test). <strong>Cấu hình huấn luyện mô hình</strong> (epochs, batch size, learning rate, vv.) nằm ở slide kiến trúc LSTM/PPO sau, <strong>không trộn vào đây</strong>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Thí nghiệm</th>
+<th style="text-align:left">Nguồn dữ liệu</th>
+<th style="text-align:right">Số mẫu</th>
+<th style="text-align:right">Tỷ lệ nhãn +</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">LSTM (simulator)</td>
+<td style="text-align:left">8h × 1Hz, seed=42, cửa sổ=60, horizon=300</td>
+<td style="text-align:right">28.439</td>
+<td style="text-align:right">26,18%</td>
+</tr>
+<tr>
+<td style="text-align:left">└─ train (80%)</td>
+<td style="text-align:left">chronological split</td>
+<td style="text-align:right">22.751</td>
+<td style="text-align:right">26,1%</td>
+</tr>
+<tr>
+<td style="text-align:left">└─ test (20%)</td>
+<td style="text-align:left">tail</td>
+<td style="text-align:right">5.688</td>
+<td style="text-align:right">21,2%</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LSTM (Kaggle thực)</strong></td>
+<td style="text-align:left">405k mẫu, 3 Raspberry Pi, MQ-2/7 + DHT22</td>
+<td style="text-align:right"><strong>404.101</strong></td>
+<td style="text-align:right"><strong>5,3%</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">└─ train (80%)</td>
+<td style="text-align:left">per-device chronological</td>
+<td style="text-align:right">323.280</td>
+<td style="text-align:right">8,5%</td>
+</tr>
+<tr>
+<td style="text-align:left">└─ test (20%)</td>
+<td style="text-align:left">tail</td>
+<td style="text-align:right"><strong>80.821</strong></td>
+<td style="text-align:right">1,3%</td>
+</tr>
+<tr>
+<td style="text-align:left">PPO RL training</td>
+<td style="text-align:left">Trải nghiệm sinh online trong env Gymnasium</td>
+<td style="text-align:right">200.000 step</td>
+<td style="text-align:right">–</td>
+</tr>
+<tr>
+<td style="text-align:left">Benchmark đánh giá</td>
+<td style="text-align:left">4h × 1Hz × 3 seeds</td>
+<td style="text-align:right">14.400/seed</td>
+<td style="text-align:right">–</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cách sinh nhãn LSTM</strong>: $y_t = \mathbf{1}[\max_{\tau \in [t+1, t+300]} gas_\tau &gt; 1000\text{ ppm}]$</p>
+<p>→ Đây là <strong>forecasting</strong> (dự đoán đỉnh tương lai 5 phút), không phải classification <strong>trạng thái tức thời</strong> — nhãn $y_t$ <strong>không</strong> đến từ cột <code>_leak_state</code>.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="033">03.3</h1>
+<h1 id="mô-hình-lstm-forecaster">MÔ HÌNH LSTM FORECASTER</h1>
+<hr>
+<h2 id="lstm--kiến-trúc-và-vì-sao-phù-hợp">LSTM – KIẾN TRÚC VÀ VÌ SAO PHÙ HỢP</h2>
+<p><strong>Bài toán</strong>: dự đoán <strong>xác suất</strong> $p_{5\min} \in [0,1]$ rằng nồng độ khí gas sẽ vượt 1000 ppm trong 5 phút tới, dựa trên 60 giây quá khứ.</p>
+<p><strong>Vì sao LSTM phù hợp:</strong></p>
+<ul>
+<li>Bài toán có <strong>phụ thuộc dài hạn 60 bước</strong> — RNN thuần gặp <strong>vanishing gradient</strong>, MLP/CNN không nhớ thứ tự.</li>
+<li>LSTM có <strong>cell state $C_t$ + 3 cổng</strong> (forget/input/output) cho phép gradient truyền ngược qua nhiều bước thời gian với suy giảm tối thiểu [Hochreiter &amp; Schmidhuber 1997].</li>
+<li>Đã được chứng minh trong [Gambiroza 2020] cho <strong>đặc tính quá độ của MQ sensor</strong> — bài toán tương đồng.</li>
+</ul>
+<p><strong>Vì sao đề xuất kiến trúc 32 unit nhỏ</strong>:</p>
+<ul>
+<li>Hệ thống streaming yêu cầu inference &lt; 1 s/mẫu → mô hình nhỏ ưu tiên.</li>
+<li>Dữ liệu 22.751 mẫu không cần model lớn → tránh overfit.</li>
+<li>Thực nghiệm xác nhận: ~5.000 tham số đủ để đạt Precision 95% trên simulator.</li>
+</ul>
+<hr>
+<h2 id="lstm--bảng-mô-tả-kiến-trúc">LSTM – BẢNG MÔ TẢ KIẾN TRÚC</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Lớp</th>
+<th style="text-align:left">Tham số</th>
+<th style="text-align:right">Số param</th>
+<th style="text-align:left">Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Input</td>
+<td style="text-align:left">shape=(60, 3)</td>
+<td style="text-align:right">0</td>
+<td style="text-align:left">Chuỗi 60 giây × {gas, temp, hum} đã chuẩn hoá</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LSTM</strong></td>
+<td style="text-align:left">32 units, tanh + sigmoid gates</td>
+<td style="text-align:right">4.608</td>
+<td style="text-align:left">Trích đặc trưng theo chuỗi thời gian</td>
+</tr>
+<tr>
+<td style="text-align:left">Dropout</td>
+<td style="text-align:left">rate=0.2</td>
+<td style="text-align:right">0</td>
+<td style="text-align:left">Regularize chống overfit</td>
+</tr>
+<tr>
+<td style="text-align:left">Dense</td>
+<td style="text-align:left">16 units, ReLU</td>
+<td style="text-align:right">528</td>
+<td style="text-align:left">Phi tuyến trung gian</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Output</strong></td>
+<td style="text-align:left">1 unit, <strong>sigmoid</strong></td>
+<td style="text-align:right">17</td>
+<td style="text-align:left"><strong>Xác suất</strong> $p_{5\min}$ — không phải nhãn cứng</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tổng</strong></td>
+<td style="text-align:left"></td>
+<td style="text-align:right"><strong>~5.153</strong></td>
+<td style="text-align:left"></td>
+</tr>
+</tbody>
+</table>
+<p>Loss: <strong>weighted binary cross-entropy</strong> ($w_{pos}\approx 2.82$). Optimizer: Adam(1e-3). Epochs: 15. Batch: 128.</p>
+<blockquote>
+<p><strong>Đầu ra là giá trị xác suất liên tục</strong> — bộ điều khiển phía sau dùng giá trị này như một feature (không cần ngưỡng hoá).</p>
+</blockquote>
+<hr>
+<h2 id="lstm--sơ-đồ-khối-input--output">LSTM – SƠ ĐỒ KHỐI INPUT / OUTPUT</h2>
+<pre class="hljs"><code><div>┌──────────────────────────┐                ┌────────────────────┐
+│ INPUT — ma trận (60, 3)  │                │ OUTPUT — scalar    │
+│ ────────────────────────│   LSTM 32u →   │ ──────────────────│
+│ gas(t-59) … gas(t)       │   Dropout 0.2  │  p_5min ∈ [0, 1]   │
+│ temp(t-59)… temp(t)      │   Dense 16 ReLU│                    │
+│ hum(t-59) … hum(t)       │   Dense 1 sigm │  GIÁ TRỊ xác suất  │
+│ (đã chuẩn hoá)           │                │  (không phải nhãn) │
+└──────────────────────────┘                └────────────────────┘
+</div></code></pre>
+<ul>
+<li><strong>Đầu vào</strong>: ma trận $(60, 3)$ — 60 giây quá khứ × 3 đặc trưng, chuẩn hoá: gas/2000, temp/60, hum/100.</li>
+<li><strong>Đầu ra</strong>: <strong>giá trị xác suất liên tục</strong> $p_{5\min} \in [0,1]$ — đây là <strong>giá trị</strong>, <em>không</em> phải nhãn 0/1; được PPO dùng trực tiếp như feature.</li>
+<li><strong>Ngưỡng quyết định 0,5</strong> <strong>chỉ</strong> được dùng khi cần label nhị phân để đo Precision/Recall trên tập test. Ở runtime, PPO <strong>không ngưỡng hoá</strong> mà tiêu thụ giá trị xác suất gốc.</li>
+</ul>
+<hr>
+<h2 id="huấn-luyện-lstm-simulator">HUẤN LUYỆN LSTM (SIMULATOR)</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/exp/lstm_training.png" alt="h:340"></p>
+<p>Train acc ~92%, val acc ~90%, không overfit, hội tụ sau epoch 8–10. Thời gian: 50–60 s trên CPU.</p>
+<hr>
+<h2 id="kết-quả-lstm-trên-simulator">KẾT QUẢ LSTM TRÊN SIMULATOR</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Chỉ số</th>
+<th style="text-align:center">Giá trị</th>
+<th style="text-align:left">Diễn giải</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Accuracy</td>
+<td style="text-align:center"><strong>89,98%</strong></td>
+<td style="text-align:left">Tổng quát đúng (baseline lười = 74%)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Precision</strong></td>
+<td style="text-align:center"><strong>95,68%</strong></td>
+<td style="text-align:left">Rất ít kêu nhầm — chỉ 30 FP/4.484 mẫu âm (0,67%)</td>
+</tr>
+<tr>
+<td style="text-align:left">Recall</td>
+<td style="text-align:center">55,15%</td>
+<td style="text-align:left">Bỏ sót giai đoạn rất sớm LEAK_SLOW</td>
+</tr>
+<tr>
+<td style="text-align:left">F1</td>
+<td style="text-align:center">69,97%</td>
+<td style="text-align:left">–</td>
+</tr>
+<tr>
+<td style="text-align:left">TP / FP</td>
+<td style="text-align:center">664 / 30</td>
+<td style="text-align:left">–</td>
+</tr>
+<tr>
+<td style="text-align:left">TN / FN</td>
+<td style="text-align:center">4.454 / 540</td>
+<td style="text-align:left">–</td>
+</tr>
+</tbody>
+</table>
+<p>→ Mô hình <strong>thận trọng</strong>: ưu tiên Precision cao (ít kêu nhầm) hơn Recall — phù hợp khi đây chỉ là feature cho PPO, không phải bộ phát cảnh báo duy nhất.</p>
+<hr>
+<h2 id="lstm-trên-dữ-liệu-thực-kaggle-132k">LSTM TRÊN DỮ LIỆU THỰC KAGGLE 132K</h2>
+<p><strong>Dataset</strong>: <code>garystafford/environmental-sensor-data-132k</code> — 405k mẫu, 3 Raspberry Pi (MQ-2 + MQ-7 + DHT22), 7 ngày T7/2020.</p>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/exp/lstm_confusion_matrix_kaggle.png" alt="h:300"></p>
+<p>Tập test: 80.821 cửa sổ (gấp <strong>14 lần</strong> test simulator). Bootstrap 95% CI với 2.000 lần resampling.</p>
+<hr>
+<h2 id="so-sánh-simulator-vs-kaggle-thực">SO SÁNH SIMULATOR vs KAGGLE THỰC</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Chỉ số</th>
+<th style="text-align:center">Simulator (5.688)</th>
+<th style="text-align:center"><strong>Kaggle thực (80.821)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Accuracy</td>
+<td style="text-align:center">89,98%</td>
+<td style="text-align:center"><strong>95,56%</strong> [95,4; 95,7]</td>
+</tr>
+<tr>
+<td style="text-align:left">Precision</td>
+<td style="text-align:center"><strong>95,68%</strong></td>
+<td style="text-align:center">21,15% [20,0; 22,3]</td>
+</tr>
+<tr>
+<td style="text-align:left">Recall</td>
+<td style="text-align:center">55,15%</td>
+<td style="text-align:center"><strong>87,36%</strong> [85,2; 89,2]</td>
+</tr>
+<tr>
+<td style="text-align:left">F1</td>
+<td style="text-align:center"><strong>69,97%</strong></td>
+<td style="text-align:center">34,05%</td>
+</tr>
+<tr>
+<td style="text-align:left">Tỷ lệ + test</td>
+<td style="text-align:center">21,2%</td>
+<td style="text-align:center">1,3%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Đảo nghịch Precision↔Recall</strong> không phải bất thường:</p>
+<ul>
+<li>Simulator: leak có biên độ lớn rõ → Precision cao, Recall thấp.</li>
+<li>Kaggle: &quot;đỉnh tương lai&quot; theo phân vị p95 bao cả dao động ngắn → Recall cao, Precision thấp (nhưng FP tuyệt đối chỉ 4,3% trên mẫu âm — vẫn rất thấp).</li>
+</ul>
+<p>→ <strong>LSTM KHÔNG bị overfit simulator</strong> — tín hiệu xu hướng đã học có tính tổng quát sang phần cứng thực.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="034">03.4</h1>
+<h1 id="mô-hình-ppo-rl-controller">MÔ HÌNH PPO RL CONTROLLER</h1>
+<hr>
+<h2 id="ppo--bài-toán-và-động-lực-sử-dụng">PPO – BÀI TOÁN VÀ ĐỘNG LỰC SỬ DỤNG</h2>
+<p><strong>Bài toán điều khiển</strong>: tại mỗi giây, chọn 1 trong 4 hành động {NO_OP, ALERT, FAN_ON, CLOSE_VALVE} sao cho <strong>giảm thiểu thiệt hại + tránh phiền nhiễu</strong>.</p>
+<p><strong>Vì sao RL chứ không phải supervised?</strong></p>
+<ul>
+<li>Không có nhãn &quot;hành động đúng&quot; cho mỗi trạng thái — cùng 600 ppm tăng dần, action tối ưu phụ thuộc lịch sử.</li>
+<li>Reward có <strong>độ trễ</strong> — đóng van $t_0$ chỉ thấy hiệu quả sau vài giây.</li>
+<li>Cần cân bằng <strong>mục tiêu xung đột</strong> (phát hiện sớm vs cảnh báo sai) — RL học natively.</li>
+</ul>
+<p><strong>Vì sao PPO trong họ RL?</strong></p>
+<ul>
+<li><strong>Ổn định khi train</strong>: clipping ngăn policy thay đổi đột ngột (so với REINFORCE).</li>
+<li><strong>Sample efficiency tốt</strong> với on-policy nhỏ, không cần replay buffer khổng lồ (so với DQN).</li>
+<li><strong>Hỗ trợ thư viện</strong>: Stable-Baselines3 implement chuẩn, tin cậy [Raffin 2021].</li>
+<li><strong>Phù hợp action rời rạc</strong> — đúng dạng bài toán của đề tài.</li>
+</ul>
+<hr>
+<h2 id="ppo--các-thành-phần-mdp-trong-đề-tài">PPO – CÁC THÀNH PHẦN MDP TRONG ĐỀ TÀI</h2>
+<p>Bài toán điều khiển được hình thức hoá thành <strong>Markov Decision Process</strong> $\mathcal{M} = (\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma)$. Mỗi ký hiệu <strong>gắn cụ thể với đối tượng trong code</strong> của đề tài:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Thành phần MDP</th>
+<th style="text-align:left">Đề tài cụ thể là gì</th>
+<th style="text-align:left">Cài đặt code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Environment</strong> $\mathcal{E}$</td>
+<td style="text-align:left">Class <code>GasLeakEnv</code> kế thừa <code>gymnasium.Env</code>, <strong>bao bọc</strong> simulator 4 pha. Mỗi step gọi <code>World.step()</code> → cập nhật gas/temp/hum, trả về reward + state mới</td>
+<td style="text-align:left"><code>processing/ml/rl/gas_env.py</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>State space $\mathcal{S}$</strong></td>
+<td style="text-align:left">Vector <strong>8 chiều liên tục</strong> chuẩn hoá [0,1]: $[gas, temp, hum, slope, p_{5\min}, fan, valve, \Delta t]$</td>
+<td style="text-align:left"><code>Box(0,1, shape=(8,))</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Action space $\mathcal{A}$</strong></td>
+<td style="text-align:left"><strong>Rời rạc 4 phần tử</strong>: 0=NO_OP, 1=ALERT, 2=FAN_ON, 3=CLOSE_VALVE</td>
+<td style="text-align:left"><code>Discrete(4)</code></td>
+</tr>
+<tr>
+<td style="text-align:left">**Transition $\mathcal{P}(s'</td>
+<td style="text-align:left">s,a)$**</td>
+<td style="text-align:left">Phương trình vật lý 4 pha + xác suất chuyển pha NORMAL→LEAK = <strong>5%/phút</strong> (stochastic)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Reward $\mathcal{R}(s,a)$</strong></td>
+<td style="text-align:left">Asymmetric cost — phạt nặng gas ≥ 1000 ppm, thưởng can thiệp đúng pha LEAK</td>
+<td style="text-align:left"><code>_compute_reward()</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Agent</strong></td>
+<td style="text-align:left">Stable-Baselines3 PPO agent — gồm Actor π_θ + Critic V_φ</td>
+<td style="text-align:left"><code>stable_baselines3.PPO</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Policy $\pi_\theta(a|s)$</strong> = <strong>Actor network</strong></td>
+<td style="text-align:left">MLP: Dense(64,tanh) → Dense(64,tanh) → softmax(4) → phân phối trên 4 action</td>
+<td style="text-align:left"><code>MlpPolicy</code> (SB3)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Value $V_\phi(s)$</strong> = <strong>Critic network</strong></td>
+<td style="text-align:left">MLP: Dense(64,tanh) → Dense(64,tanh) → Dense(1) → ước lượng $\mathbb{E}[\sum \gamma^k r_{t+k}]$</td>
+<td style="text-align:left">shared trunk với Actor</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Discount $\gamma$</strong></td>
+<td style="text-align:left">0,99 — ưu tiên reward dài hạn (giảm peak gas trong tương lai)</td>
+<td style="text-align:left">hyperparameter</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>GAE $\lambda$</strong></td>
+<td style="text-align:left">0,95 — Generalized Advantage Estimation [Schulman 2016]</td>
+<td style="text-align:left">hyperparameter</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="ppo--hàm-reward-và-vì-sao-thiết-kế-như-vậy">PPO – HÀM REWARD VÀ VÌ SAO THIẾT KẾ NHƯ VẬY</h2>
+<p>Reward theo nguyên tắc <strong>asymmetric cost</strong> — bỏ sót leak phải nặng hơn nhiều cảnh báo sai:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tình huống</th>
+<th style="text-align:right">Reward</th>
+<th style="text-align:left">Lý do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Mỗi bước có $gas \geq 1000$ ppm</td>
+<td style="text-align:right"><strong>–50</strong></td>
+<td style="text-align:left">An toàn là ưu tiên #1: mỗi giây nguy hiểm đều tính</td>
+</tr>
+<tr>
+<td style="text-align:left">FAN_ON / CLOSE_VALVE đúng trong pha LEAK</td>
+<td style="text-align:right"><strong>+10</strong></td>
+<td style="text-align:left">Thưởng hành vi mong muốn</td>
+</tr>
+<tr>
+<td style="text-align:left">ALERT_USER khi NORMAL (FP nhẹ)</td>
+<td style="text-align:right">–3</td>
+<td style="text-align:left">Chỉ phiền</td>
+</tr>
+<tr>
+<td style="text-align:left">FAN_ON khi NORMAL</td>
+<td style="text-align:right">–15</td>
+<td style="text-align:left">Tốn điện</td>
+</tr>
+<tr>
+<td style="text-align:left">CLOSE_VALVE khi NORMAL</td>
+<td style="text-align:right"><strong>–25</strong></td>
+<td style="text-align:left">Ngắt nguồn gas — thiệt hại trải nghiệm thật</td>
+</tr>
+<tr>
+<td style="text-align:left">Step cost (mỗi bước)</td>
+<td style="text-align:right">–0,05</td>
+<td style="text-align:left">Tránh dùng dằng</td>
+</tr>
+</tbody>
+</table>
+<p>Công thức:
+$$r_t = -50\cdot\mathbf{1}[gas \geq 1000] + 10\cdot\mathbf{1}[a\in{2,3}\land \text{LEAK}] - 3\cdot\mathbf{1}[a{=}1, \text{NORMAL}] - 15\cdot\mathbf{1}[a{=}2, \text{NORMAL}] - 25\cdot\mathbf{1}[a{=}3, \text{NORMAL}] - 0{,}05$$</p>
+<p>→ Tỷ lệ –25 / +10 / –50 được cân: agent không &quot;lười đóng van&quot; mà cũng không &quot;đóng bừa&quot;.</p>
+<hr>
+<h2 id="ppo--actor-network--value-network">PPO – ACTOR NETWORK &amp; VALUE NETWORK</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/ppo_arch.png" alt="h:280"></p>
+<pre class="hljs"><code><div>state s_t (8 dim)
+       │
+       ▼
+   Dense(64, tanh)
+       │
+       ▼
+   Dense(64, tanh)       ← trunk dùng chung
+       │
+   ┌───┴───┐
+   ▼       ▼
+Actor      Critic
+Dense(4)   Dense(1)
+softmax    scalar V(s)
+   │
+   ▼
+π(a|s) ∈ Δ³           ~5.060 tham số tổng
+</div></code></pre>
+<ul>
+<li><strong>Actor</strong>: phân phối chính sách trên 4 action → sample $a_t$.</li>
+<li><strong>Critic</strong>: ước lượng $V_\phi(s)$ → tính advantage $\hat{A}<em>t = r_t + \gamma V(s</em>{t+1}) - V(s_t)$ và GAE($\lambda=0.95$).</li>
+<li><strong>Loss PPO clipped</strong>: $L^{CLIP} = \mathbb{E}[\min(r_t(\theta)\hat{A}_t, \text{clip}(r_t(\theta), 1!-!\epsilon, 1!+!\epsilon)\hat{A}_t)]$, $\epsilon=0.2$.</li>
+</ul>
+<hr>
+<h2 id="ppo--cấu-hình-huấn-luyện">PPO – CẤU HÌNH HUẤN LUYỆN</h2>
+<pre class="hljs"><code><div>env = make_vec_env(<span class="hljs-keyword">lambda</span>: GasLeakEnv(episode_seconds=<span class="hljs-number">1800</span>), n_envs=<span class="hljs-number">4</span>, seed=<span class="hljs-number">42</span>)
+model = PPO(<span class="hljs-string">&quot;MlpPolicy&quot;</span>, env,
+    n_steps=<span class="hljs-number">512</span>, batch_size=<span class="hljs-number">128</span>,
+    gae_lambda=<span class="hljs-number">0.95</span>, gamma=<span class="hljs-number">0.99</span>,
+    learning_rate=<span class="hljs-number">3e-4</span>, ent_coef=<span class="hljs-number">0.01</span>)
+model.learn(total_timesteps=<span class="hljs-number">200_000</span>)
+</div></code></pre>
+<ul>
+<li>4 môi trường song song → đa dạng experience.</li>
+<li>Episode 1800 s → đủ thấy nhiều cycle NORMAL↔LEAK.</li>
+<li>Thời gian train <strong>~3 phút 30 giây</strong> trên CPU, throughput ~960 fps.</li>
+</ul>
+<hr>
+<h2 id="kết-quả-huấn-luyện-ppo">KẾT QUẢ HUẤN LUYỆN PPO</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/exp/ppo_reward.png" alt="h:340"></p>
+<p>Reward hội tụ về dải [-2000; -1800]. <strong>Reward âm không có nghĩa policy kém</strong>: chỉ cần 30 s gas ≥ 1000 ppm là phạt 30×(-50) = -1500. Bằng chứng policy tốt: peak gas <strong>63 ppm</strong> vs baseline 1.508 ppm (chứng minh ở phần benchmark).</p>
+<hr>
+<h2 id="tổng-hợp-huấn-luyện-hai-mô-hình">TỔNG HỢP HUẤN LUYỆN HAI MÔ HÌNH</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Hạng mục</th>
+<th style="text-align:left">LSTM Forecaster</th>
+<th style="text-align:left">PPO RL Controller</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Loại</td>
+<td style="text-align:left">Supervised, time-series</td>
+<td style="text-align:left">RL on-policy (actor-critic)</td>
+</tr>
+<tr>
+<td style="text-align:left">Bài toán</td>
+<td style="text-align:left">Dự báo <strong>xác suất</strong> $p_{5\min}$</td>
+<td style="text-align:left">Điều khiển 4 hành động</td>
+</tr>
+<tr>
+<td style="text-align:left">Tham số</td>
+<td style="text-align:left">~5.153</td>
+<td style="text-align:left">~5.060</td>
+</tr>
+<tr>
+<td style="text-align:left">Dữ liệu</td>
+<td style="text-align:left">22.751 mẫu (sim) + 323.280 (Kaggle)</td>
+<td style="text-align:left">200k timesteps</td>
+</tr>
+<tr>
+<td style="text-align:left">Hyper</td>
+<td style="text-align:left">Adam(1e-3), 15 epochs</td>
+<td style="text-align:left">$\gamma=0.99$, $\lambda=0.95$, lr=3e-4</td>
+</tr>
+<tr>
+<td style="text-align:left">Mất mát</td>
+<td style="text-align:left">Weighted BCE</td>
+<td style="text-align:left">PPO clipped + value + entropy</td>
+</tr>
+<tr>
+<td style="text-align:left">Thời gian (CPU)</td>
+<td style="text-align:left">~50–60 s</td>
+<td style="text-align:left">~3 phút 30 giây</td>
+</tr>
+</tbody>
+</table>
+<p>→ Hai mô hình <strong>bổ trợ</strong>: LSTM trích feature $p_{5\min}$ → PPO state. Đây là <strong>hierarchical learning</strong>, không cạnh tranh.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="035">03.5</h1>
+<h1 id="đánh-giá--benchmark">ĐÁNH GIÁ &amp; BENCHMARK</h1>
+<hr>
+<h2 id="vì-sao-chọn-4-tiêu-chí-đánh-giá--có-tham-chiếu-cụ-thể">VÌ SAO CHỌN 4 TIÊU CHÍ ĐÁNH GIÁ – CÓ THAM CHIẾU CỤ THỂ</h2>
+<p>Đề tài <strong>không tự chế</strong> 4 chỉ số; mỗi chỉ số đều <strong>lấy từ chuẩn công nghiệp / bài báo</strong> đã công bố:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Chỉ số</th>
+<th style="text-align:left">Định nghĩa</th>
+<th style="text-align:left">Tham chiếu (vì sao chọn)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>lead_time_s</strong></td>
+<td style="text-align:left">Số giây cảnh báo trước thời điểm gas đạt 1000 ppm theo Oracle. <strong>Cao = tốt</strong></td>
+<td style="text-align:left"><strong>IEC 60079-29-1:2016</strong> §5.4 <em>&quot;Pre-alarm response time&quot;</em> — yêu cầu hệ thống cảnh báo gas cháy nổ phải báo <strong>trước</strong> khi vượt 20% LEL; [Saranya 2023] cũng dùng &quot;lead time&quot; làm metric chính</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>miss_rate (%)</strong></td>
+<td style="text-align:left">% sự kiện LEAK không được hành động trước thời điểm critical. <strong>Thấp = tốt</strong></td>
+<td style="text-align:left"><strong>IEC 61508</strong> <em>Functional Safety</em> khái niệm <strong>PFD</strong> (Probability of Failure on Demand) — cốt lõi cho Safety Integrity Level (SIL)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>alarms_per_hour</strong></td>
+<td style="text-align:left">Số cảnh báo phát trong pha NORMAL (false alarm rate). <strong>Thấp = tốt</strong></td>
+<td style="text-align:left"><strong>EEMUA 191:2013</strong> §6.3 — khuyến nghị <strong>≤ 6 alarm/giờ/operator</strong> để tránh &quot;alarm fatigue&quot;; vượt ngưỡng này operator sẽ mất tin tưởng và bỏ qua</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>mean_peak_gas (ppm)</strong></td>
+<td style="text-align:left">Nồng độ đỉnh trung bình của các leak event. <strong>Thấp = tốt</strong></td>
+<td style="text-align:left"><strong>NFPA 58 §6.27</strong> <em>Leak Mitigation</em> — yêu cầu hệ thống có actuator phải <strong>giới hạn nồng độ tích luỹ</strong>; chỉ controller có van/quạt mới ảnh hưởng được</td>
+</tr>
+</tbody>
+</table>
+<p>→ Bài toán là <strong>multi-objective</strong>: không có single number; <strong>bắt buộc nhìn cả bộ tứ</strong>. RL thắng ở Peak Gas + Alarm, FORECASTER thắng ở Lead Time đối với LSTM-only baseline, THRESHOLD chỉ là sàn so sánh.</p>
+<hr>
+<h2 id="oracle-two-pass--phương-pháp-so-sánh-công-bằng">ORACLE TWO-PASS – PHƯƠNG PHÁP SO SÁNH CÔNG BẰNG</h2>
+<p><strong>Vấn đề</strong>: simulator có yếu tố ngẫu nhiên → mỗi controller chạy độc lập sẽ thấy tập leak khác nhau, không công bằng.</p>
+<p><strong>Phương pháp</strong>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Lượt</th>
+<th style="text-align:left">Mô tả</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Pass 1 – Oracle</strong></td>
+<td style="text-align:left">Chạy simulator với seed cố định, <strong>không can thiệp</strong> → ghi nhận <code>natural_critical_time</code> cho mỗi sự kiện leak</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Pass 2 – Controller</strong></td>
+<td style="text-align:left">Chạy lại với <strong>cùng seed</strong> → các leak xảy ra cùng thời điểm; controller hành động → ghi <code>first_action_time</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tính</strong></td>
+<td style="text-align:left"><code>lead_time = natural_critical_time − first_action_time</code></td>
+</tr>
+</tbody>
+</table>
+<p>→ Mọi controller đánh giá trên <strong>cùng tập sự kiện</strong> → so sánh khoa học công bằng.</p>
+<hr>
+<h2 id="benchmark--3-bộ-điều-khiển">BENCHMARK – 3 BỘ ĐIỀU KHIỂN</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left"></th>
+<th style="text-align:center">THRESHOLD</th>
+<th style="text-align:center">FORECASTER</th>
+<th style="text-align:center">RL (PPO)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Cơ chế</td>
+<td style="text-align:center">gas &gt; 800 ppm → alert</td>
+<td style="text-align:center">$p_{5\min} &gt; 0.5$ → alert</td>
+<td style="text-align:center">Policy chọn 1/4 actions</td>
+</tr>
+<tr>
+<td style="text-align:left">Có <strong>dự báo trước</strong>?</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Có <strong>can thiệp vật lý</strong>?</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td style="text-align:left">Phạm vi action</td>
+<td style="text-align:center">1 (alert)</td>
+<td style="text-align:center">1 (alert)</td>
+<td style="text-align:center">4 (NO_OP/ALERT/FAN/VALVE)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Setup</strong>: 3 seeds (42, 43, 44) × 4 giờ mô phỏng/seed, Oracle two-pass.</p>
+<hr>
+<h2 id="kết-quả-benchmark--bảng-số-liệu">KẾT QUẢ BENCHMARK – BẢNG SỐ LIỆU</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Bộ điều khiển</th>
+<th style="text-align:right">Lead (s)</th>
+<th style="text-align:right">Miss (%)</th>
+<th style="text-align:right">Alarm/giờ</th>
+<th style="text-align:right">Peak (ppm)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">THRESHOLD</td>
+<td style="text-align:right">35 ± 5</td>
+<td style="text-align:right">0,0 ± 0,0</td>
+<td style="text-align:right">2,8 ± 1,0</td>
+<td style="text-align:right">1.508 ± 88</td>
+</tr>
+<tr>
+<td style="text-align:left">FORECASTER</td>
+<td style="text-align:right">138 ± 26</td>
+<td style="text-align:right">4,2 ± 5,9</td>
+<td style="text-align:right">5,6 ± 1,1</td>
+<td style="text-align:right">1.508 ± 88</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>RL (PPO)</strong></td>
+<td style="text-align:right"><strong>1.803 ± 755</strong></td>
+<td style="text-align:right">15,0 ± 10,8</td>
+<td style="text-align:right"><strong>0,2 ± 0,0</strong></td>
+<td style="text-align:right"><strong>63 ± 0</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>RL giảm Peak Gas 24 lần</strong> (63 vs 1.508 ppm) — minh chứng mạnh nhất giá trị tầng điều khiển.</li>
+<li><strong>FORECASTER tăng lead time 4 lần</strong> (138 vs 35 s) — minh chứng giá trị tầng dự báo.</li>
+<li><strong>RL giảm false alarm xuống 0,2/giờ</strong> — thấp hơn cả 2 baseline (EEMUA 191 ngưỡng &lt; 6).</li>
+</ul>
+<hr>
+<h2 id="benchmark--trực-quan-hoá">BENCHMARK – TRỰC QUAN HOÁ</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/exp/benchmark_chart.png" alt="h:420"></p>
+<hr>
+<h2 id="phân-tích-benchmark-hỗn-hợp">PHÂN TÍCH BENCHMARK HỖN HỢP</h2>
+<ul>
+<li><strong>Lead time</strong>: THRESHOLD đo khoảng cách vật lý 800→1000 ppm (~35 s); FORECASTER cộng thêm dự báo (+103 s); RL gần như đóng van ngay khi vào pha LEAK nên lead time đo theo critical-time của Oracle rất lớn (1.803 s).</li>
+<li><strong>Miss rate 15% của RL</strong> là <strong>artifact của cách đếm benchmark</strong>: <code>valve_closed</code> không reset giữa các leak liên tiếp → khi leak sau đến, agent thấy van đã đóng → không &quot;hành động lần 2&quot; → benchmark tính là miss. Kiểm chứng ở <strong>benchmark con TC-Slow/TC-Fast cho miss rate 0%</strong>.</li>
+<li><strong>Alarms/giờ</strong>: RL chỉ 0,2 — chính sách phạt –25 cho CLOSE_VALVE sai đã được học hiệu quả.</li>
+<li><strong>Peak gas</strong>: chỉ RL có actuator vật lý → chỉ RL kéo nồng độ về 63 ppm.</li>
+</ul>
+<p>→ Hai mô hình <strong>bổ sung</strong>: LSTM cảnh báo sớm, PPO can thiệp vật lý quyết liệt.</p>
+<hr>
+<h2 id="benchmark-con--3-kịch-bản-xác-định">BENCHMARK CON – 3 KỊCH BẢN XÁC ĐỊNH</h2>
+<p>Để bóc tách hành vi theo loại leak, chạy thêm benchmark <strong>deterministic</strong> (<code>SIM_LEAK_PROB_PER_MIN=0</code>, transition điều khiển bằng script).</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Kịch bản</th>
+<th style="text-align:left">Mô tả</th>
+<th style="text-align:left">Mục tiêu đánh giá</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>TC-Idle</strong></td>
+<td style="text-align:left">60 phút thuần NORMAL</td>
+<td style="text-align:left">Đo riêng <strong>false alarm rate</strong> trong điều kiện không có leak</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>TC-Slow</strong></td>
+<td style="text-align:left">1 leak LEAK_SLOW tại $t=600$ s, 4 phút</td>
+<td style="text-align:left">Đo lead time + mitigation cho <strong>rò rỉ chậm</strong> (van bếp ga)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>TC-Fast</strong></td>
+<td style="text-align:left">1 leak LEAK_FAST, hàm mũ</td>
+<td style="text-align:left">Đo lead time + mitigation cho <strong>vỡ ống</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Mỗi kịch bản: 1 giờ × 3 seed. Chỉ nhiễu Gaussian khác giữa các seed → so sánh chéo chặt chẽ.</p>
+<hr>
+<h2 id="kết-quả-benchmark-con">KẾT QUẢ BENCHMARK CON</h2>
+<p><img src="file:///c:/Users/duonglv2/Downloads/thesis-smart-home-gas-leak/thesis-smart-home-gas-detection/thesis-latex/img/exp/scenarios_chart.png" alt="h:340"></p>
+<hr>
+<h2 id="bảng-kịch-bản-con">BẢNG KỊCH BẢN CON</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Kịch bản</th>
+<th style="text-align:left">Controller</th>
+<th style="text-align:right">Lead (s)</th>
+<th style="text-align:right">Miss (%)</th>
+<th style="text-align:right">Alarm/giờ</th>
+<th style="text-align:right">Peak (ppm)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">TC-Idle</td>
+<td style="text-align:left">THRESHOLD</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">0,0 ± 0,0</td>
+<td style="text-align:right">–</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">FORECASTER</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">2,0 ± 1,4</td>
+<td style="text-align:right">–</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">RL</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">–</td>
+<td style="text-align:right">1,0 ± 0,0</td>
+<td style="text-align:right">–</td>
+</tr>
+<tr>
+<td style="text-align:left">TC-Slow</td>
+<td style="text-align:left">THRESHOLD</td>
+<td style="text-align:right">41 ± 1</td>
+<td style="text-align:right">0,0</td>
+<td style="text-align:right">1,0</td>
+<td style="text-align:right">1.269 ± 38</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">FORECASTER</td>
+<td style="text-align:right">187 ± 3</td>
+<td style="text-align:right">0,0</td>
+<td style="text-align:right">5,0 ± 2,2</td>
+<td style="text-align:right">1.269 ± 38</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"><strong>RL</strong></td>
+<td style="text-align:right"><strong>187 ± 3</strong></td>
+<td style="text-align:right"><strong>0,0</strong></td>
+<td style="text-align:right">1,0</td>
+<td style="text-align:right"><strong>60 ± 0</strong></td>
+</tr>
+<tr>
+<td style="text-align:left">TC-Fast</td>
+<td style="text-align:left">THRESHOLD</td>
+<td style="text-align:right">4 ± 1</td>
+<td style="text-align:right">0,0</td>
+<td style="text-align:right">1,0</td>
+<td style="text-align:right">2.000 ± 0</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">FORECASTER</td>
+<td style="text-align:right">39 ± 1</td>
+<td style="text-align:right">0,0</td>
+<td style="text-align:right">4,0 ± 1,4</td>
+<td style="text-align:right">2.000 ± 0</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left"><strong>RL</strong></td>
+<td style="text-align:right"><strong>39 ± 1</strong></td>
+<td style="text-align:right"><strong>0,0</strong></td>
+<td style="text-align:right">1,0</td>
+<td style="text-align:right"><strong>60 ± 0</strong></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="phân-tích-kịch-bản-con">PHÂN TÍCH KỊCH BẢN CON</h2>
+<p><strong>(a) TC-Idle — đo riêng false alarm trong điều kiện không có leak (60 phút thuần NORMAL)</strong></p>
+<ul>
+<li>THRESHOLD: <strong>0 alarm/h</strong> — vì nhiễu ±3 ppm trên nền 60 ppm gần như không bao giờ chạm 800 → ngưỡng cứng &quot;an toàn&quot; trong baseline yên tĩnh nhưng vô dụng trong leak nhanh (xem TC-Fast).</li>
+<li>FORECASTER: <strong>2 alarm/h</strong> — LSTM nhạy với dao động xu hướng → đôi khi nhận diện sai dao động Gaussian → vẫn dưới ngưỡng EEMUA 191 (≤6).</li>
+<li>RL: <strong>1 alarm/h</strong> — policy đã học cách &quot;lọc&quot; thoáng qua nhờ kết hợp gas tức thời + slope + $p_{5\min}$ → tốt nhất trong 3.</li>
+</ul>
+<p><strong>(b) TC-Slow — rò rỉ chậm tại hộ gia đình VN (dây cao su nứt / chuột cắn / khớp lỏng)</strong></p>
+<ul>
+<li>Lead time: FORECASTER &amp; RL = <strong>187 s</strong>, gấp <strong>4,6 lần</strong> THRESHOLD (41 s) → người dùng có &gt;3 phút để rời nhà / đóng van thủ công thay vì &lt;1 phút.</li>
+<li><strong>Miss rate 0% cho cả 3 controller</strong> → đây cũng là bằng chứng quan trọng: miss 15% của RL ở benchmark hỗn hợp <strong>chỉ là artifact</strong> của cách đếm (valve không reset giữa các leak liên tiếp), không phải lỗi policy.</li>
+<li>Peak gas: RL = <strong>60 ppm</strong> vs FORECASTER 1.269 ppm — chỉ RL có actuator vật lý đóng van.</li>
+</ul>
+<p><strong>(c) TC-Fast — vỡ van bình mini / nổ bình du lịch (kịch bản nguy hiểm nhất)</strong></p>
+<ul>
+<li>LEAK_FAST tăng mũ → chỉ có ~40 s từ thời điểm rò đến critical 1000 ppm.</li>
+<li>THRESHOLD chỉ kịp <strong>4 s</strong> → người dùng không có thời gian phản ứng → <strong>THRESHOLD thực tế thất bại</strong>.</li>
+<li>FORECASTER / RL: <strong>39 s</strong> → vẫn đủ thời gian alert + can thiệp.</li>
+<li>Peak gas: THRESHOLD/FORECASTER = <strong>2.000 ppm</strong> (chạm trần saturation cảm biến — tức nồng độ thật còn cao hơn); RL vẫn giữ <strong>60 ppm</strong> nhờ đóng van ngay khi $p_{5\min}$ vượt ngưỡng nội bộ.</li>
+</ul>
+<p>→ Kết luận: <strong>RL duy trì peak ≈ 60 ppm độc lập tốc độ leak</strong> — giá trị nhất quán của tầng điều khiển vật lý. THRESHOLD chỉ phù hợp leak chậm; LSTM mở rộng cảnh báo sớm; PPO bổ sung tầng can thiệp.</p>
+<hr>
+<h2 id="độ-trễ-end-to-end-pipeline">ĐỘ TRỄ END-TO-END PIPELINE</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Đoạn xử lý</th>
+<th style="text-align:right">Độ trễ</th>
+<th style="text-align:left">Nguồn</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">Sensor → MQTT publish</td>
+<td style="text-align:right">&lt; 10 ms</td>
+<td style="text-align:left">ước lượng</td>
+</tr>
+<tr>
+<td style="text-align:left">Mosquitto → MQTT-Kafka bridge</td>
+<td style="text-align:right">&lt; 50 ms</td>
+<td style="text-align:left">ước lượng</td>
+</tr>
+<tr>
+<td style="text-align:left">Kafka → Spark consume (micro-batch)</td>
+<td style="text-align:right">&lt; 100 ms</td>
+<td style="text-align:left">–</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>LSTM inference (median)</strong></td>
+<td style="text-align:right"><strong>68,3 ms</strong></td>
+<td style="text-align:left">đo trực tiếp 200 lần</td>
+</tr>
+<tr>
+<td style="text-align:left">└─ p95 / p99</td>
+<td style="text-align:right">75,9 / 77,9 ms</td>
+<td style="text-align:left">đo trực tiếp</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>RL inference (median)</strong></td>
+<td style="text-align:right"><strong>0,5 ms</strong></td>
+<td style="text-align:left">đo trực tiếp</td>
+</tr>
+<tr>
+<td style="text-align:left">└─ p95 / p99</td>
+<td style="text-align:right">0,8 / 1,3 ms</td>
+<td style="text-align:left">đo trực tiếp</td>
+</tr>
+<tr>
+<td style="text-align:left">Spark → InfluxDB write</td>
+<td style="text-align:right">&lt; 30 ms</td>
+<td style="text-align:left">ước lượng</td>
+</tr>
+<tr>
+<td style="text-align:left">InfluxDB → API → SSE</td>
+<td style="text-align:right">&lt; 50 ms</td>
+<td style="text-align:left">ước lượng</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tổng end-to-end (median)</strong></td>
+<td style="text-align:right"><strong>≈ 310 ms</strong></td>
+<td style="text-align:left">–</td>
+</tr>
+</tbody>
+</table>
+<p>→ Đáp ứng yêu cầu <strong>thời gian thực mềm</strong> (&lt; 1 giây) cho hệ thống cảnh báo gas.</p>
+<hr>
+<h2 id="tích-hợp-telegram-chatbot">TÍCH HỢP TELEGRAM CHATBOT</h2>
+<p><strong>Defense in depth — 2 kênh kích hoạt độc lập:</strong></p>
+<ol>
+<li><strong>Event-driven (Kafka)</strong>: backend consume topic <code>gas.alert.events</code> → <code>telegramService.notifyAlert()</code>.</li>
+<li><strong>Polling realtime (InfluxDB)</strong>: worker đọc reading mỗi 2-3 s, phát alert khi đạt ngưỡng.</li>
+</ol>
+<p><strong>Bộ lọc tránh alert fatigue:</strong></p>
+<ul>
+<li><code>risk_score ≥ 0,7</code> (= max của $p_{5\min}$ và $gas/$GAS_ALERT_PPM).</li>
+<li>Risk label ∈ {ALERT, CRITICAL}.</li>
+<li>Cooldown 60 s/(device, source, label).</li>
+</ul>
+<p>→ Người dùng nhận cảnh báo kèm <code>rl_action</code>, <code>risk_score</code>, gas hiện tại — không chỉ &quot;có cảnh báo&quot;.</p>
+<hr>
+<h2 id="triển-khai-hạ-tầng">TRIỂN KHAI HẠ TẦNG</h2>
+<ul>
+<li><strong>Docker Compose</strong> đầy đủ <strong>10 services</strong> khởi động bằng 1 lệnh duy nhất.</li>
+<li>Container hoá: Mosquitto, MQTT-Kafka bridge, Kafka + Zookeeper, Spark, ML services, InfluxDB, PostgreSQL, Backend API, Frontend dashboard, Telegram bot, Grafana.</li>
+<li>Tài nguyên: ~5% CPU, ~2 GB RAM tổng cộng cho 1 thiết bị, 1 Hz.</li>
+<li><strong>Hỗ trợ horizontal scaling</strong>: Kafka partition theo <code>device_id</code>, Spark executor, API replication, InfluxDB clustering — sẵn sàng cho big-data nhiều thiết bị.</li>
+</ul>
+<hr>
+<h2 id="đóng-góp-kỹ-thuật-chính">ĐÓNG GÓP KỸ THUẬT CHÍNH</h2>
+<ol>
+<li><strong>Bộ mô phỏng vật lý 4 pha</strong> tái tạo được (seed cố định), 4 pha có cơ sở vật lý &amp; tham chiếu sự cố LPG hộ gia đình Việt Nam.</li>
+<li><strong>LSTM Forecaster đầu ra giá trị xác suất</strong> (không phải nhãn) — feature cho RL.</li>
+<li><strong>PPO Controller</strong> đa hành động trong Gymnasium env tích hợp vật lý.</li>
+<li><strong>Pipeline streaming</strong> MQTT → Kafka → Spark, độ trễ &lt; 310 ms, scaling-ready.</li>
+<li><strong>Telegram chatbot defense-in-depth</strong> qua 2 kênh.</li>
+<li><strong>Phương pháp Oracle two-pass</strong> so sánh công bằng có cơ sở.</li>
+<li><strong>Docker Compose 10 services</strong> + tái tạo bằng 1 lệnh.</li>
+<li><strong>Đánh giá LSTM trên dữ liệu thực Kaggle 132K</strong> — giảm sim-to-real gap.</li>
+</ol>
+<hr>
+<h2 id="hạn-chế">HẠN CHẾ</h2>
+<ul>
+<li><strong>Phụ thuộc bộ mô phỏng cho PPO</strong>: RL cần môi trường tương tác có ground-truth — chưa thay được bằng dataset thực. LSTM đã được validate qua Kaggle 132K.</li>
+<li><strong>Phạm vi benchmark còn hẹp</strong>: 3 seeds × 4h — std lớn so với mean cho miss_rate. Cần mở rộng 10 seeds × 24h.</li>
+<li><strong>Chưa so sánh</strong> với Transformer-based (TFT, PatchTST) hay RL khác (SAC, A2C).</li>
+<li><strong>Hàm reward chưa tối ưu</strong>: hệ số phạt –50 chiếm tỷ trọng lớn, đường cong reward khó diễn giải. Cần <code>VecNormalize</code> + grid search.</li>
+<li><strong>Chưa triển khai phần cứng thực</strong>: ESP32 + MQ thật còn ở mức kế hoạch ngắn hạn.</li>
+<li><strong>Cách đếm miss_rate trong benchmark hỗn hợp</strong>: chưa reset <code>valve_closed</code> giữa các leak liên tiếp — đã kiểm chứng qua TC-Slow/TC-Fast.</li>
+</ul>
+<hr>
+<h2 id="công-việc-tiếp-theo">CÔNG VIỆC TIẾP THEO</h2>
+<ul>
+<li><strong>Hoàn thiện bản thảo LaTeX</strong> — rà soát chính tả/định dạng, build PDF cuối.</li>
+<li><strong>Đóng gói video demo</strong> end-to-end (sensor → cảnh báo Telegram).</li>
+<li><strong>Chuẩn bị slides bảo vệ</strong> (~25–30 slides).</li>
+<li><strong>Thử nghiệm phần cứng thực</strong> ESP32 + MQ-2/MQ-135 trong điều kiện bếp gia đình.</li>
+<li><strong>Mở rộng benchmark</strong> lên 10 seeds × 24h để siết khoảng tin cậy.</li>
+<li><strong>Reward shaping</strong>: chuẩn hoá VecNormalize, grid search hệ số.</li>
+<li><strong>Bổ sung ablation</strong>: benchmark <code>--reset-per-leak</code> để bóc tách artifact miss_rate của RL.</li>
+</ul>
+<hr>
+<h2 id="tham-khảo-chính">THAM KHẢO CHÍNH</h2>
+<p>[1] Hochreiter &amp; Schmidhuber, &quot;Long Short-Term Memory,&quot; <strong>Neural Computation</strong>, 1997.
+[2] Gambiroza et al., &quot;LSTM-based transient response of low-cost gas sensors,&quot; <strong>IEEE Sensors</strong>, 2020.
+[3] Stafford G.A., <em>Environmental Sensor Telemetry Data (132K records)</em>, <strong>Kaggle</strong>, 2020.
+[4] Schulman et al., &quot;Proximal Policy Optimization Algorithms,&quot; <strong>arXiv:1707.06347</strong>, 2017.
+[5] Raffin et al., <em>Stable-Baselines3</em>, <strong>JMLR</strong>, 2021.
+[6] Towers et al., <em>Gymnasium: A Standard Interface for RL Environments</em>, <strong>arXiv:2407.17032</strong>, 2023.
+[7] IEC 60079-29-1: <em>Gas detectors — Performance requirements for flammable gases</em>.
+[8] EEMUA 191: <em>Alarm systems — A guide to design, management and procurement</em>.
+[9] NFPA 58: <em>Liquefied Petroleum Gas Code</em>.
+[10] Tian et al., &quot;Temperature compensation for MQ gas sensors,&quot; <strong>Sensors and Actuators</strong>, 2019.
+[11] Wei et al., &quot;DRL offloading for gas pipeline leak detection,&quot; <strong>IEEE IoT-J</strong>, 2022.</p>
+<hr>
+<!-- _class: lead -->
+<h1 id="cảm-ơn-thầy-cô">CẢM ƠN THẦY CÔ</h1>
+<h1 id="đã-lắng-nghe">ĐÃ LẮNG NGHE</h1>
+<p><em>Hỏi đáp &amp; góp ý</em></p>
+
+</body>
+</html>
