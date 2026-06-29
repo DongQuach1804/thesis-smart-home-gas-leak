@@ -76,7 +76,7 @@ function Invoke-LocalTests {
     python -m pytest @stubArgs
     $stubExit = $LASTEXITCODE
 
-    $modelPath = Join-Path $ROOT "processing\ml\lstm\best_lstm_uci.keras"
+    $modelPath = Join-Path $ROOT "processing\ml\lstm\gas_forecaster.keras"
     if (Test-Path $modelPath) {
         Write-Step "Running full LSTM inference tests (model found)"
 
