@@ -1,0 +1,18 @@
+{
+  "definition": "MAE and RMSE computed on thresholded binary event forecasts.",
+  "note": "These are not ppm regression errors because the current LSTM outputs event risk probability, not future gas_ppm.",
+  "results": {
+    "Simulation": {
+      "total": 5688,
+      "errors": 540,
+      "mae": 0.0949367088607595,
+      "rmse": 0.3081180112566604
+    },
+    "Kaggle": {
+      "total": 80822,
+      "errors": 2945,
+      "mae": 0.036438098537526914,
+      "rmse": 0.1908876594689319
+    }
+  }
+}
