@@ -1,0 +1,112 @@
+% ============================================================
+%  KLTN – Hệ thống phát hiện rò rỉ khí gas thông minh
+%  Trường Đại học Công nghệ Thông tin – ĐHQG TP.HCM
+% ============================================================
+\documentclass{template/thesis}
+
+\Title{HỆ THỐNG PHÁT HIỆN RÒ RỈ KHÍ GAS THÔNG MINH TÍCH HỢP IoT, DỰ BÁO LSTM VÀ HỌC TĂNG CƯỜNG PPO}
+\Title[en]{A SMART GAS LEAK DETECTION SYSTEM INTEGRATING IoT, LSTM FORECASTING AND PPO REINFORCEMENT LEARNING}
+
+\ThesisType{KHÓA LUẬN TỐT NGHIỆP}
+
+\University{ĐẠI HỌC QUỐC GIA THÀNH PHỐ HỒ CHÍ MINH}
+\CollegeOrDept{{TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN}}
+\Faculty{KHOA MẠNG MÁY TÍNH VÀ TRUYỀN THÔNG}
+\Degree{CỬ NHÂN}
+\Major{MẠNG MÁY TÍNH VÀ TRUYỀN THÔNG DỮ LIỆU}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{needspace}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{pgfgantt}
+\usepackage{enumitem}
+\usepackage{longtable}
+
+% Màu sắc cho Gantt chart
+\definecolor{primaryblue}{HTML}{2E75B6}
+\definecolor{criticalred}{HTML}{C00000}
+
+% Code listing style
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{orange},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  breaklines=true,
+  frame=single,
+  captionpos=t,
+  aboveskip=1em,
+  belowskip=1em,
+  tabsize=2,
+  showstringspaces=false
+}
+
+\graphicspath{{img/}}
+
+\Author{Lê Viết Dương}{22520300}
+\Author{Quách Minh Đông}{22520259}
+
+\ThesisYear{2026}
+\ThesisLocation{TP. HỒ CHÍ MINH}
+
+\Supervisor{ThS. Nguyễn Khánh Thuật}
+
+\DeclareBibliographyCategory{vietnamese}
+\addtocategory{vietnamese}{pccc2023}
+
+\hypersetup{
+  pdfencoding=auto,
+  pdfauthor={Lê Viết Dương, Quách Minh Đông},
+  pdfsubject={Phát hiện rò rỉ khí gas thông minh},
+  pdftitle={Hệ thống phát hiện rò rỉ khí gas thông minh tích hợp IoT, dự báo LSTM và học tăng cường PPO},
+  pdfkeywords={IoT, LSTM, Reinforcement Learning, Gas Leak Detection, Kafka, Spark, Telegram}
+}
+
+\begin{document}
+
+\beforepreface
+\afterpreface
+
+\chapter{Mở đầu}
+\label{c:intro}
+\input{chapters/1-MoDau}
+
+\chapter{Cơ sở lý thuyết}
+\label{c:cosolythuyet}
+\input{chapters/2-CoSoLyThuyet}
+
+\chapter{Phương pháp thực hiện}
+\label{c:phuongphapthuchien}
+\input{chapters/3-PhuongPhapThucHien}
+
+\chapter{Thực nghiệm, đánh giá và thảo luận}
+\label{c:thucnghiemdanhgia}
+\input{chapters/4-ThucNghiemDanhGia}
+
+\chapter{Kết luận và hướng phát triển}
+\label{c:ketluanvaphattrien}
+\input{chapters/5-KetLuanPhatTrien}
+
+\begingroup
+\setlength{\emergencystretch}{8em}
+\phantomsection
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo}
+
+\nocite{*}
+
+\printbibheading[title={Tài liệu tham khảo}]
+\justifying
+\printbibliography[heading=subbibliography, title={Tài liệu tiếng Việt}, category=vietnamese]
+\printbibliography[heading=subbibliography, title={Tài liệu tiếng Anh}, notcategory=vietnamese]
+\endgroup
+
+\end{document}
