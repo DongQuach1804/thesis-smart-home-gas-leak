@@ -1,0 +1,154 @@
+% ============================================================
+%  Chương 1: Mở đầu
+% ============================================================
+
+Chương mở đầu trình bày bối cảnh hình thành đề tài, nhu cầu phát hiện và ứng phó rò rỉ khí gas trong môi trường nhà ở, cũng như những hạn chế của cách cảnh báo bằng ngưỡng tĩnh. Từ đó, chương này xác định mục tiêu, đóng góp, phạm vi nghiên cứu và cấu trúc của khóa luận. Đây là cơ sở để các chương sau triển khai phần lý thuyết, phương pháp hiện thực và thực nghiệm đánh giá.
+
+\section{Tính cấp thiết của đề tài}
+
+Khí gas hóa lỏng (LPG) và khí tự nhiên (natural gas) được sử dụng rộng rãi trong các hộ gia đình và cơ sở sản xuất tại Việt Nam. Tuy nhiên, đây cũng là nguồn gây ra các vụ cháy nổ nghiêm trọng do rò rỉ không được phát hiện kịp thời. Theo báo cáo của Cục Phòng cháy chữa cháy và Cứu nạn cứu hộ \cite{pccc2023}, hàng năm xảy ra hàng trăm vụ cháy nổ liên quan đến khí gas tại Việt Nam, gây thiệt hại lớn về người và tài sản.
+
+Các hệ thống phát hiện khí gas thương mại hiện tại chủ yếu hoạt động theo nguyên tắc ngưỡng tĩnh: cảm biến đo nồng độ khí theo thời gian thực và kích hoạt cảnh báo khi nồng độ vượt một ngưỡng định sẵn (thường là 10\% LEL – Lower Explosive Limit). Cách làm này đơn giản và dễ triển khai, nhưng vẫn còn một số hạn chế:
+
+\begin{itemize}
+  \item Phản ứng muộn: Cảnh báo chỉ phát ra khi khí đã đạt mức nguy hiểm, đúng lúc người dùng có thể đã ngửi thấy mùi. Không còn nhiều thời gian để sơ tán hay can thiệp.
+  \item Tỷ lệ cảnh báo sai cao: Các yếu tố môi trường như độ ẩm, nhiệt độ, và sự hiện diện của các khí khác có thể kích hoạt cảnh báo nhầm \cite{tian2019}.
+  \item Không có khả năng dự báo: Hệ thống ngưỡng tĩnh không thể phân biệt được một vụ rò rỉ đang tăng dần nguy hiểm (sẽ đạt ngưỡng trong vài phút) với một mức nền cao hơn bình thường nhưng ổn định.
+  \item Phản ứng đơn lẻ: Hầu hết chỉ phát âm thanh báo động, không tự động kích hoạt các biện pháp giảm thiểu như bật quạt thông gió hay đóng van gas.
+\end{itemize}
+
+Sự phát triển của Internet of Things (IoT) và học máy giúp có thêm hướng xử lý chủ động hơn: hệ thống không chỉ đọc giá trị cảm biến hiện tại mà còn có thể theo dõi xu hướng tăng của khí, ước lượng rủi ro trong vài phút tới và chọn cách can thiệp phù hợp. Đây là hướng mà nhóm lựa chọn để triển khai trong đề tài.
+
+\section{Tổng quan về các nghiên cứu liên quan}
+
+Nhiều nhóm nghiên cứu đã đề xuất các cải tiến cho hệ thống phát hiện khí gas truyền thống.
+
+Hướng tiếp cận cảm biến và IoT: Saranya và cộng sự \cite{saranya2023} xây dựng hệ thống phát hiện khí gas sử dụng Arduino và cảm biến MQ-2, tích hợp cảnh báo qua SMS. Nwazor và cộng sự \cite{nwazor2023} đề xuất kiến trúc IoT dựa trên ESP8266 với điều khiển từ xa qua ứng dụng di động. Guo và cộng sự \cite{guo2019} sử dụng mạng cảm biến không dây di động để giám sát rò rỉ trong không gian rộng. Các phương pháp này cải thiện khả năng kết nối nhưng vẫn giữ nguyên cơ chế ngưỡng tĩnh.
+
+Hướng tiếp cận học máy: Abbas và Abdullah \cite{abbas2021} tích hợp mạng nơ-ron để phân loại mức độ nguy hiểm. Kutcharlapati và cộng sự \cite{kutcharlapati2023} áp dụng học máy cho dự đoán rò rỉ đường ống gas. Tuy nhiên, hầu hết chỉ thực hiện phân loại trạng thái hiện tại, không dự báo tương lai.
+
+Hướng tiếp cận LSTM và dự báo chuỗi thời gian: Gambiroza và cộng sự \cite{gambiroza2020} chứng minh LSTM có thể học được đặc tính quá độ (transient) của cảm biến khí gas giá rẻ từ dữ liệu 20 giây đầu tiên sau khi cảm biến bật -- một dạng dự báo sớm về loại khí. Đây là nền tảng lý thuyết cho việc sử dụng LSTM trong dự báo rủi ro khí gas.
+
+Hướng tiếp cận học tăng cường: Wei và cộng sự \cite{wei2022} đề xuất phương pháp offloading tính toán dựa trên học tăng cường sâu cho phát hiện rò rỉ đường ống gas. Trong phạm vi tài liệu nhóm khảo sát, các nghiên cứu này chưa tập trung vào việc ghép dự báo LSTM với bộ điều khiển PPO trong một luồng IoT phục vụ môi trường nhà ở.
+
+Từ khảo sát trên, nhóm xác định hướng triển khai của đề tài là kết hợp ba phần: (i) dự báo xác suất rủi ro theo thời gian thực bằng LSTM, (ii) bộ điều khiển tự động đa hành động bằng PPO, và (iii) luồng IoT có khả năng truyền và xử lý dữ liệu cảm biến liên tục.
+
+\section{Mục tiêu và đóng góp của đề tài}
+
+\subsection{Mục tiêu}
+
+Đề tài hướng đến việc xây dựng một hệ thống IoT hỗ trợ giám sát, phát hiện và ứng phó với nguy cơ rò rỉ khí gas trong môi trường nhà thông minh. Hệ thống khai thác dữ liệu cảm biến theo thời gian để dự báo sớm rủi ro, đồng thời hỗ trợ lựa chọn hành động xử lý phù hợp.
+
+Các mục tiêu chính của đề tài gồm:
+
+\begin{itemize}[label=\textendash]
+  \item Thiết kế kiến trúc hệ thống IoT phân tầng cho việc thu thập, truyền, xử lý và hiển thị dữ liệu cảm biến khí gas.
+
+  \item Ứng dụng mô hình học máy để dự báo xu hướng rủi ro từ dữ liệu cảm biến theo thời gian.
+
+  \item Tích hợp cơ chế điều khiển thông minh và xây dựng các testcase thực nghiệm để đánh giá hoạt động của hệ thống.
+\end{itemize}
+
+\subsection{Đóng góp kỹ thuật}
+
+\begin{itemize}[label=\textendash]
+\item Đề xuất mô hình kết hợp LSTM và PPO cho bài toán giám sát rò rỉ khí gas, trong đó LSTM dự báo rủi ro trong tương lai gần và PPO lựa chọn hành động điều khiển dựa trên trạng thái hiện tại cùng tín hiệu dự báo.
+
+\item Xây dựng mô hình, tạo môi trường mô phỏng và các testcase rò rỉ có kiểm soát, cho phép huấn luyện, đánh giá và so sánh các bộ điều khiển.
+
+\item Hiện thực luồng xử lý dữ liệu gần thời gian thực với MQTT, Kafka và Spark Structured Streaming, đồng thời tích hợp bảng điều khiển và Telegram để hiển thị trạng thái, hành động điều khiển và cảnh báo cho người dùng.
+\end{itemize}
+
+
+\section{Phạm vi và giới hạn của đề tài}
+
+Đề tài sử dụng bộ mô phỏng phần mềm thay cho phần cứng ESP32 thực tế trong quá trình huấn luyện mô hình. Bộ mô phỏng dùng các phương trình động lực học đơn giản hóa để biểu diễn rò rỉ chậm, rò rỉ nhanh và pha thông gió; vì vậy kết quả cần được xem là bằng chứng trong môi trường mô phỏng, chưa thay thế cho kiểm thử an toàn trên phần cứng thực.
+
+Đề tài tập trung vào khí gas dân dụng (LPG) trong môi trường nhà ở, không bao gồm các khí công nghiệp đặc thù. Tầng thiết bị được thiết kế theo đặc tính của dòng cảm biến MQ sử dụng vật liệu bán dẫn oxit kim loại (MOS); trong thí nghiệm, tín hiệu nồng độ theo đơn vị ppm được sinh bởi bộ mô phỏng phần mềm.
+
+\section{Cấu trúc của khóa luận}
+
+Khóa luận được tổ chức thành năm chương như sau:
+
+\begin{itemize}
+  \item Chương 1 – Mở đầu: Trình bày tính cấp thiết của đề tài, tổng quan nghiên cứu liên quan, mục tiêu và phạm vi nghiên cứu.
+  \item Chương 2 – Cơ sở lý thuyết: Trình bày các nền tảng lý thuyết được sử dụng trong đề tài bao gồm IoT, giao thức MQTT, Apache Kafka, Apache Spark, mạng LSTM, học tăng cường PPO và Telegram Bot API.
+  \item Chương 3 – Phương pháp thực hiện: Mô tả chi tiết kiến trúc hệ thống 4 lớp, thiết kế từng thành phần, quy trình huấn luyện mô hình và phương pháp triển khai.
+  \item Chương 4 – Thực nghiệm, đánh giá và thảo luận: Trình bày kết quả huấn luyện mô hình, kết quả benchmark so sánh bốn bộ điều khiển, và phân tích hệ thống trong điều kiện vận hành.
+  \item Chương 5 – Kết luận và hướng phát triển: Tóm tắt kết quả đạt được, rút ra bài học kinh nghiệm và đề xuất các hướng phát triển tiếp theo.
+\end{itemize}
+
+\section{Phân công công việc}
+
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{3pt}
+
+% Ẩn dấu gạch đen overfull ở mép phải
+\setlength{\overfullrule}{0pt}
+
+% Cố định độ dày đường kẻ bảng để tránh hàng đầu bị đậm bất thường
+\setlength{\arrayrulewidth}{0.4pt}
+
+% Giữ nguyên kích thước bảng hiện tại
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+
+\begin{longtable}{
+|>{\centering\arraybackslash}p{0.8cm}
+|>{\raggedright\arraybackslash}p{\dimexpr\textwidth-0.8cm-2.6cm-6\tabcolsep-4\arrayrulewidth\relax}
+|>{\centering\arraybackslash}p{2.6cm}|
+}
+\caption{Phân công công việc giữa các sinh viên}
+\label{tab:task_assignment} \\
+\hline
+\textbf{STT} & \textbf{Nội dung công việc} & \textbf{Người thực hiện} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{STT} & \textbf{Nội dung công việc} & \textbf{Người thực hiện} \\
+\hline
+\endhead
+
+1 & Khảo sát các công trình nghiên cứu liên quan đến nhà thông minh, IoT, dự đoán dữ liệu môi trường và học tăng cường & Cả hai \\
+\hline
+
+2 & Thiết kế kiến trúc tổng thể hệ thống nhà thông minh theo mô hình IoT 4 lớp & Cả hai \\
+\hline
+
+3 & Triển khai lớp thiết bị bao gồm cảm biến MQ-135, DHT22 và vi điều khiển ESP32 & Minh Đông \\
+\hline
+
+4 & Xây dựng lớp truyền thông gồm MQTT Broker, MQTT--Kafka Bridge và hệ thống truyền dữ liệu & Minh Đông \\
+\hline
+
+5 & Xây dựng luồng xử lý dữ liệu gần thời gian thực sử dụng Apache Kafka và Apache Spark & Minh Đông \\
+\hline
+
+6 & Tiền xử lý dữ liệu và xây dựng mô hình dự báo nồng độ khí sử dụng LSTM & Viết Dương \\
+\hline
+
+7 & Thiết kế môi trường và huấn luyện mô hình học tăng cường PPO cho bài toán điều khiển thiết bị & Viết Dương \\
+\hline
+
+8 & Tích hợp mô hình LSTM và PPO vào luồng xử lý dữ liệu gần thời gian thực & Viết Dương \\
+\hline
+
+9 & Phát triển dịch vụ API Node.js/TypeScript và xây dựng REST API & Cả hai \\
+\hline
+
+10 & Xây dựng hệ thống lưu trữ InfluxDB, bảng điều khiển Grafana và Telegram Bot & Cả hai \\
+\hline
+
+11 & Tích hợp toàn bộ hệ thống và kiểm thử thực nghiệm & Cả hai \\
+\hline
+
+12 & Đánh giá hệ thống, phân tích kết quả và hoàn thiện báo cáo khóa luận & Cả hai \\
+\hline
+
+\end{longtable}
+\endgroup
+
+\vspace{0.5em}
+Chương này đã nêu lý do chọn đề tài, tổng quan các hướng nghiên cứu liên quan, mục tiêu, đóng góp kỹ thuật, phạm vi giới hạn và phân công công việc. Các nội dung này định hướng cho Chương~\ref{c:cosolythuyet}, nơi các nền tảng lý thuyết chính của hệ thống được trình bày chi tiết hơn.
