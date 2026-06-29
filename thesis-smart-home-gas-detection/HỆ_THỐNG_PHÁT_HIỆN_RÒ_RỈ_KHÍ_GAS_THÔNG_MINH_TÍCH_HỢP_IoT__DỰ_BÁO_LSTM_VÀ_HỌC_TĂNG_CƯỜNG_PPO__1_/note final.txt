@@ -1,0 +1,36 @@
+Tên tiếng anh bôi đỏ, cách dòng
+Ở đầu chương cần có 1 đoạn 3-5 nêu cần làm gì và cuối chương cũng có 1 đoạn để kết chương
+mục 2.1.1 cần sửa lại
+cần thêm related work ở chương 2
+ko được lùi 3 số để a,b,c,d
+Lưu ý 3.6.1, 4.2,4.2.1
+Cần chốt PPO hoặc RL, ở C3 cần viết để PPO là thuật toán phù hợp
+Cần cân đối báo cáo ko để 1 mục có quá nhiều mục nhỏ
+Sửa 5.1.2 thành Hạn chế
+Nên việt hóa
+Ở mục 1.3.1 Mục tiêu nên viết chung chung không cần viết cụ thể (đừng ánh xạ giá trị cụ thể)
+Các từ ngữ chuyên ngành nên viết đủ trước rồi mới viết tắt
+Phần 1.3.2 nên cấu trúc lại với 3 chấm là đủ
+Sửa lại bang để cắt dòng
+Chương 2 không nên đề cập đến đề tài
+LSTM nên để đoạn đừng để theo chấm
+sửa chữ trách nhiệm = vai trò
+Cần thống nhất caption của ảnh
+note lại fallback 
+api để vào bang
+Bỏ huấn luyện ML
+Cần làm rõ dataset = biểu đồ histogram
+Các tiêu chí cần có ý nghĩa và công thức
+4.5.1 trùng vs c2
+tiêu chí đánh giá gom lại
+Cần mô tả thiết lập lstm, posch các thứ
+mô tả lstm cần biểu đồ urgency, loss -> confusion matrix đưa lên trc rồi đưa them biểu đồ, them epotch, -> các tiêu chí còn lại
+Kết quả của timeseries là rmse ..., còn của nhãn/classification là confusion matrix
+Cần đánh giá lại metrix đánh giá
+nếu đã nêu thì cần nói là: những thiết lập của quá trình huấn luyện
+Cần phân tích rõ benchmark controller, cần phân tích rõ 4 controller
+Cần nêu rõ TC-slow, TC-fast
+Cái RL có hội tụ không, cái biểu đồ tích lũy, cần them các hyper parameter
+Cần cấu trúc lại nội dung kịch bản
+Cần mô tả mean, median, P95.P99
+Không để subsection kết luận của 4.10 cứ viết đoạn văn bth 
