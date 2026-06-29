@@ -1,0 +1,8 @@
+\chapter*{Tóm tắt}
+Đề tài xuất phát từ bài toán cảnh báo rò rỉ khí gas trong môi trường nhà thông minh. Nhiều thiết bị cảnh báo hiện nay vẫn dùng ngưỡng cố định: khi nồng độ khí vượt một mức đặt trước thì còi mới kêu. Cách làm này đơn giản, dễ triển khai nhưng còn bị động, đặc biệt trong trường hợp khí tăng chậm hoặc các diễn biến thất thường.
+
+Để giải quyết vấn đề này, khóa luận đề xuất hệ thống phát hiện rò rỉ khí gas theo kiến trúc IoT 4 lớp gồm: lớp thiết bị, lớp truyền thông, lớp xử lý và lớp ứng dụng. Hệ thống kết hợp mô hình LSTM để dự báo nguy cơ nồng độ khí vượt ngưỡng trong khoảng thời gian ngắn tiếp theo và bộ điều khiển PPO để lựa chọn hành động phù hợp như: gửi cảnh báo, bật quạt thông gió, đóng van gas hoặc không làm gì khi không có gì bất thường.
+
+Trong phạm vi thực nghiệm, lớp thiết bị sử dụng bộ mô phỏng để sinh dữ liệu có nhãn. Dữ liệu được truyền qua MQTT và Kafka, xử lý bằng Apache Spark Structured Streaming, sau đó hiển thị qua API Node.js, bảng điều khiển web và chatbot Telegram. Các dịch vụ được đóng gói bằng Docker Compose để thuận tiện cho việc chạy lại thí nghiệm.
+
+Kết quả thực nghiệm trên các kịch bản mô phỏng cho thấy bộ điều khiển PPO có khả năng giảm tỷ lệ bỏ sót cảnh báo và hạn chế nồng độ khí đỉnh tốt hơn so với các phương pháp đường cơ sở như ngưỡng tĩnh, luật tay và chỉ dùng mô hình dự báo LSTM. Kết quả bước đầu cho thấy hướng kết hợp dự báo chuỗi thời gian và PPO có tiềm năng ứng dụng trong hệ thống giám sát khí gas thông minh, nhưng vẫn cần được kiểm thử thêm trên phần cứng và dữ liệu khí gas thực tế.
