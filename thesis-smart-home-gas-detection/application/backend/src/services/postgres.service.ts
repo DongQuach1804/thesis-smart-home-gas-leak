@@ -88,8 +88,15 @@ class PostgresService {
     }
   }
 
-  async recentAlerts(limit = 50): Promise<unknown[]> {
+  async recentAlerts(limit = 50, deviceId = ""): Promise<unknown[]> {
     if (!this.healthy) return [];
+    const params: unknown[] = [];
+    let where = "";
+    if (deviceId) {
+      params.push(deviceId);
+      where = `WHERE device_id = $${params.length}`;
+    }
+    params.push(limit);
     const r = await this.pool.query(
       `SELECT device_id AS "deviceId",
               gas_ppm AS "gasPpm",
@@ -98,15 +105,23 @@ class PostgresService {
               event_ts AS "eventTs",
               created_at AS "createdAt"
          FROM alert_events
+        ${where}
         ORDER BY event_ts DESC
-        LIMIT $1`,
-      [limit],
+        LIMIT $${params.length}`,
+      params,
     );
     return r.rows;
   }
 
-  async recentActions(limit = 50): Promise<unknown[]> {
+  async recentActions(limit = 50, deviceId = ""): Promise<unknown[]> {
     if (!this.healthy) return [];
+    const params: unknown[] = [];
+    let where = "";
+    if (deviceId) {
+      params.push(deviceId);
+      where = `WHERE device_id = $${params.length}`;
+    }
+    params.push(limit);
     const r = await this.pool.query(
       `SELECT device_id AS "deviceId",
               action,
@@ -116,9 +131,10 @@ class PostgresService {
               event_ts AS "eventTs",
               created_at AS "createdAt"
          FROM action_events
+        ${where}
         ORDER BY event_ts DESC
-        LIMIT $1`,
-      [limit],
+        LIMIT $${params.length}`,
+      params,
     );
     return r.rows;
   }

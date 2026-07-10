@@ -88,9 +88,9 @@ class _RuleOnlyAgent:
         _humidity_percent: float,
         p_critical_5min: float,
     ):
-        if gas_ppm >= 1000.0 or p_critical_5min >= 0.7:
+        if gas_ppm >= 900.0 or (gas_ppm >= 700.0 and p_critical_5min >= 0.7):
             return 3, "CLOSE_VALVE"
-        if gas_ppm >= 700.0 or p_critical_5min >= 0.4:
+        if gas_ppm >= 600.0 or p_critical_5min >= 0.4:
             return 2, "FAN_ON"
         if p_critical_5min >= 0.3:
             return 1, "ALERT_USER"
@@ -390,13 +390,15 @@ def write_batch(df, batch_id: int) -> None:
     alert_messages_sent = False
     action_messages_sent = False
 
-    for row in rows:
+    batch_ingest_base_ms = int(time.time() * 1000)
+
+    for row_index, row in enumerate(rows):
         device_id        = row.device_id or "unknown"
         gas_ppm          = float(row.gas_ppm)
         temperature_c    = float(row.temperature_c)
         humidity_percent = float(row.humidity_percent)
         source_event_ts  = _normalize_epoch_ms(row.event_ts)
-        event_ts         = int(time.time() * 1000) if use_ingest_time else source_event_ts
+        event_ts         = batch_ingest_base_ms + row_index if use_ingest_time else source_event_ts
         if not use_ingest_time and _is_stale_event(event_ts, raw_max_age_s):
             logger.warning(
                 "Skipping stale sensor row: device=%s age_sec=%d gas=%.1f",
@@ -440,6 +442,7 @@ def write_batch(df, batch_id: int) -> None:
             action_id, action_name = 0, "NO_OP"
 
         # ── Persist to InfluxDB ─────────────────────────────────────────
+        processed_at_ms = int(time.time() * 1000)
         point = (
             Point("gas_reading")
             .tag("device_id",  device_id)
@@ -451,6 +454,9 @@ def write_batch(df, batch_id: int) -> None:
             .field("lstm_risk_score",     legacy_score)
             .field("predicted_risk_5min", p5)
             .field("rl_action_id",        action_id)
+            .field("event_ts_ms",         source_event_ts)
+            .field("processed_at_ms",     processed_at_ms)
+            .field("pipeline_latency_ms", max(0, processed_at_ms - source_event_ts))
             .time(event_ts, WritePrecision.MS)
         )
         points.append(point)

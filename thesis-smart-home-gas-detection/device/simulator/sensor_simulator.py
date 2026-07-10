@@ -26,6 +26,9 @@ SIM_PUBLISH_HZ        : publish rate in Hz (default 1.0)
 SIM_LEAK_PROB_PER_MIN : probability of a leak starting in any given minute
                         while NORMAL (default 0.10)
 SIM_SEED              : random seed for reproducible benchmarks (optional)
+SIM_SCENARIO          : optional deterministic evaluation scenario:
+                        TC1_NORMAL, TC2_COOKING_CLOSED_ROOM,
+                        TC3_PIPE_JOINT_LEAK, TC4_RECOVERY
 """
 from __future__ import annotations
 
@@ -62,6 +65,7 @@ logger.info(f"Connecting to MQTT {MQTT_HOST}:{MQTT_PORT}, topic={MQTT_TOPIC}")
 PUBLISH_HZ = max(0.1, float(os.getenv("SIM_PUBLISH_HZ", "1.0")))
 LEAK_PROB_PER_MIN = min(max(float(os.getenv("SIM_LEAK_PROB_PER_MIN", "0.05")), 0.0), 1.0)
 CRITICAL_PPM = max(1.0, float(os.getenv("SIM_CRITICAL_PPM", "1000.0")))
+SCENARIO = os.getenv("SIM_SCENARIO", "RANDOM").strip().upper() or "RANDOM"
 
 _seed = os.getenv("SIM_SEED")
 if _seed:
@@ -123,6 +127,87 @@ STEP_FN = {
     State.LEAK_FAST: _step_leak_fast,
     State.VENTILATING: _step_ventilating,
 }
+
+
+SCENARIO_ALIASES = {
+    "TC1": "TC1_NORMAL",
+    "NORMAL": "TC1_NORMAL",
+    "TC1_NORMAL": "TC1_NORMAL",
+    "TC2": "TC2_COOKING_CLOSED_ROOM",
+    "COOKING": "TC2_COOKING_CLOSED_ROOM",
+    "COOKING_CLOSED_ROOM": "TC2_COOKING_CLOSED_ROOM",
+    "TC2_COOKING_CLOSED_ROOM": "TC2_COOKING_CLOSED_ROOM",
+    "TC3": "TC3_PIPE_JOINT_LEAK",
+    "LEAK": "TC3_PIPE_JOINT_LEAK",
+    "PIPE_JOINT_LEAK": "TC3_PIPE_JOINT_LEAK",
+    "TC3_PIPE_JOINT_LEAK": "TC3_PIPE_JOINT_LEAK",
+    "TC4": "TC4_RECOVERY",
+    "RECOVERY": "TC4_RECOVERY",
+    "TC4_RECOVERY": "TC4_RECOVERY",
+    "RANDOM": "RANDOM",
+}
+
+
+def _scenario_name() -> str:
+    return SCENARIO_ALIASES.get(SCENARIO, "RANDOM")
+
+
+def _approach(current: float, target: float, rate: float, dt: float) -> float:
+    """Move current toward target by at most rate units per second."""
+    if current < target:
+        return min(target, current + rate * dt)
+    return max(target, current - rate * dt)
+
+
+def _apply_scenario(w: World, elapsed_s: float, dt: float) -> None:
+    """Deterministic traces for thesis test cases.
+
+    These scenarios only shape the emitted sensor stream. The processing
+    pipeline still performs LSTM/RL inference exactly as it does in runtime.
+    """
+    name = _scenario_name()
+
+    if name == "TC1_NORMAL":
+        w.state = State.NORMAL
+        w.gas = _approach(w.gas, 70.0 + 8.0 * math.sin(elapsed_s / 25.0), 10.0, dt)
+        w.temp = _approach(w.temp, 28.0 + 0.4 * math.sin(elapsed_s / 60.0), 0.5, dt)
+        w.hum = _approach(w.hum, 60.0 + 1.5 * math.sin(elapsed_s / 50.0), 0.8, dt)
+        return
+
+    if name == "TC2_COOKING_CLOSED_ROOM":
+        w.state = State.NORMAL
+        # Simulates cooking in a closed room: gas-related reading rises slowly
+        # and plateaus below the critical leak threshold.
+        target_gas = 120.0 + min(elapsed_s * 3.0, 380.0)
+        if elapsed_s > 120:
+            target_gas = _approach(target_gas, 420.0, 2.0, elapsed_s - 120)
+        w.gas = _approach(w.gas, target_gas, 3.0, dt)
+        w.temp = _approach(w.temp, 32.0, 0.03, dt)
+        w.hum = _approach(w.hum, 72.0, 0.05, dt)
+        return
+
+    if name == "TC3_PIPE_JOINT_LEAK":
+        w.state = State.LEAK_SLOW
+        # Minor leak at hose / joint: persistent rising gas concentration.
+        w.gas += 10.0 * dt + random.gauss(0, 1.0) * dt
+        w.gas = min(w.gas, 1450.0)
+        w.temp = _approach(w.temp, 29.0, 0.02, dt)
+        w.hum = _approach(w.hum, 63.0, 0.03, dt)
+        return
+
+    if name == "TC4_RECOVERY":
+        w.state = State.VENTILATING
+        if elapsed_s < dt * 1.5 and w.gas < 900.0:
+            w.gas = 1150.0
+        _step_ventilating(w, dt)
+        w.temp = _approach(w.temp, 28.5, 0.04, dt)
+        w.hum = _approach(w.hum, 60.0, 0.08, dt)
+        if w.gas <= 110.0:
+            w.state = State.NORMAL
+        return
+
+    STEP_FN[w.state](w, dt)
+    _maybe_transition(w, dt)
 
 
 def _maybe_transition(w: World, dt: float) -> None:
@@ -286,8 +371,7 @@ def main() -> None:
                     time.sleep(1)
                     continue
 
-            STEP_FN[world.state](world, dt)
-            _maybe_transition(world, dt)
+            _apply_scenario(world, counter * dt, dt)
             world.state_age_s += dt
 
             payload = build_payload(world)

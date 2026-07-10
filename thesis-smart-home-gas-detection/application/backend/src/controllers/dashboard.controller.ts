@@ -97,8 +97,9 @@ export async function getSystemOverview(_req: Request, res: Response): Promise<v
 
 export async function getRecentAlerts(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Number(req.query.limit ?? 50), 500);
+  const deviceId = (req.query.device_id as string) ?? "";
   try {
-    const rows = await postgresService.recentAlerts(limit);
+    const rows = await postgresService.recentAlerts(limit, deviceId);
     res.status(200).json(rows);
   } catch (err) {
     console.error("[dashboard/alerts]", err);
@@ -110,8 +111,9 @@ export async function getRecentAlerts(req: Request, res: Response): Promise<void
 
 export async function getRecentActions(req: Request, res: Response): Promise<void> {
   const limit = Math.min(Number(req.query.limit ?? 50), 500);
+  const deviceId = (req.query.device_id as string) ?? "";
   try {
-    const rows = await postgresService.recentActions(limit);
+    const rows = await postgresService.recentActions(limit, deviceId);
     res.status(200).json(rows);
   } catch (err) {
     console.error("[dashboard/actions]", err);

@@ -177,6 +177,7 @@
       const POLL_MS      = 3000;   // latest reading poll interval
       const HISTORY_MINS = 5;
       const MAX_CHART_PTS = 60;
+      let activeDeviceId = new URLSearchParams(window.location.search).get("device_id") || "";
 
       // risk label → CSS class & colour
       const RISK_META = {
@@ -219,6 +220,22 @@
         FAN_ON:      "💨 ventilation engaged",
         CLOSE_VALVE: "🛑 gas valve closed",
       };
+
+      function updateActionCard(action) {
+        const safeAction = action || "NO_OP";
+        const actionVal = document.getElementById("rl-action-val");
+        const actionSub = document.getElementById("rl-action-sub");
+        if (actionVal) actionVal.textContent = safeAction;
+        if (actionSub) actionSub.textContent = ACTION_MEANING[safeAction] || "â€”";
+        const actionCard = document.getElementById("card-action");
+        if (actionCard) {
+          actionCard.dataset.action = safeAction;
+          actionCard.style.borderLeft = safeAction === "CLOSE_VALVE" ? "3px solid #ef4444"
+            : safeAction === "FAN_ON"     ? "3px solid #f59e0b"
+            : safeAction === "ALERT_USER" ? "3px solid #38bdf8"
+                                         : "3px solid transparent";
+        }
+      }
 
       function updateKpis(d) {
         const hasFreshData = d._source !== "no_fresh_data";
@@ -317,7 +334,8 @@
       // ─── Poll latest reading ───────────────────────────────────────────────
       async function pollLatest() {
         try {
-          const r = await fetch(`${API}/dashboard/latest`);
+          const qs = activeDeviceId ? `?device_id=${encodeURIComponent(activeDeviceId)}` : "";
+          const r = await fetch(`${API}/dashboard/latest${qs}`);
           const d = await r.json();
           if (r.ok && d && d.gasPpm !== undefined) {
             if (d._source === "no_fresh_data") {
@@ -364,6 +382,8 @@
           const gasPpm = toNumber(a.gasPpm ?? a.gas_ppm);
           const riskScore = toNumber(a.riskScore ?? a.predictedRisk5Min ?? a.predicted_risk_5min);
           const source = a.alertSource || a.alert_source || "alert";
+          activeDeviceId = deviceId;
+          if (a.rlAction || a.rl_action) updateActionCard(a.rlAction || a.rl_action);
           const meta  = RISK_META[label] || RISK_META.NORMAL;
           const li    = document.createElement("li");
           const ts    = new Date(alertTimestamp(a)).toLocaleString("vi-VN", { hour12: false });

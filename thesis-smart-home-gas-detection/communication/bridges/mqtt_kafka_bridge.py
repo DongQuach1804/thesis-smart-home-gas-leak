@@ -99,7 +99,7 @@ def _write_raw_influx(payload: dict) -> None:
         risk_label, action_name, action_id = "NORMAL", "NO_OP", 0
 
     point = (
-        Point("gas_reading")
+        Point("gas_raw_reading")
         .tag("device_id", device_id)
         .tag("risk_label", risk_label)
         .tag("rl_action", action_name)

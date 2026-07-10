@@ -150,6 +150,9 @@ services:
       - .env
     environment:
       - MQTT_BROKER_HOST=mosquitto
+      - DEVICE_ID=${SIM_DEVICE_ID:-esp32-lab-01}
+      - SIM_SCENARIO=${SIM_SCENARIO:-RANDOM}
+      - SIM_LEAK_PROB_PER_MIN=${SIM_LEAK_PROB_PER_MIN:-0.10}
     depends_on:
       mosquitto:
         condition: service_started

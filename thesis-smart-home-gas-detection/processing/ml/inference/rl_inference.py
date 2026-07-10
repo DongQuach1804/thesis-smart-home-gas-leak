@@ -36,11 +36,11 @@ class _RuleFallback:
         gas_ppm = gas_norm * 2000.0
         slope_ppm_per_s = (slope_norm - 0.5) * 20.0
 
-        if gas_ppm > 800 and not valve:
+        if gas_ppm >= 900 and not valve:
             return 3                           # CLOSE_VALVE
-        if p5 > 0.7 and not valve:
+        if gas_ppm >= 700 and p5 > 0.7 and not valve:
             return 3
-        if (p5 > 0.4 or slope_ppm_per_s > 1.0) and not fan:
+        if (gas_ppm >= 600 or p5 > 0.4 or slope_ppm_per_s > 1.0) and not fan:
             return 2                           # FAN_ON
         if p5 > 0.3:
             return 1                           # ALERT_USER

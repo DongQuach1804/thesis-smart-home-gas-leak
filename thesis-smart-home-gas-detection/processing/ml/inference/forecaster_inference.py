@@ -36,11 +36,30 @@ FEATURE_BOUNDS = {
 HORIZON_SECONDS = int(os.getenv("FORECAST_HORIZON_SECONDS", "300"))   # 5 min
 CRITICAL_PPM = float(os.getenv("FORECAST_CRITICAL_PPM", "1000.0"))
 SEQ_LEN = int(os.getenv("FORECAST_SEQ_LEN", "60"))                     # 60 s window
+CALIBRATION_ENABLED = os.getenv(
+    "FORECAST_CALIBRATION_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _norm(v: float, feat: str) -> float:
     lo, hi = FEATURE_BOUNDS[feat]
     return float(np.clip((v - lo) / (hi - lo + 1e-8), 0.0, 1.0))
+
+
+def _calibrate_probability(prob: float, gas_ppm: float) -> float:
+    """Cap certainty alerts while gas is still far below CRITICAL_PPM."""
+    if not CALIBRATION_ENABLED:
+        return float(round(float(np.clip(prob, 0.0, 1.0)), 4))
+
+    if gas_ppm < 500.0:
+        cap = 0.65
+    elif gas_ppm < 650.0:
+        cap = 0.85
+    elif gas_ppm < 800.0:
+        cap = 0.95
+    else:
+        cap = 1.0
+    return float(round(min(float(np.clip(prob, 0.0, 1.0)), cap), 4))
 
 
 class _TrendFallback:
@@ -81,7 +100,7 @@ class _TrendFallback:
         # around CRITICAL_PPM so values just below 1000 still indicate risk.
         margin = 200.0
         prob = 1.0 / (1.0 + math.exp(-(predicted - CRITICAL_PPM) / margin))
-        return float(round(prob, 4))
+        return _calibrate_probability(prob, current)
 
 
 class GasForecaster:
@@ -147,7 +166,7 @@ class GasForecaster:
         if self._model is not None and len(nbuf) == self.seq_len:
             x = np.array(list(nbuf), dtype=np.float32).reshape(1, self.seq_len, 3)
             y = self._model.predict(x, verbose=0)
-            return float(round(float(y[0][0]), 4))
+            return _calibrate_probability(float(y[0][0]), gas_ppm)
 
         # Fallback: trend extrapolation — works even with partial buffer
         return self._fallback.predict_proba(np.array(list(rbuf), dtype=np.float32))
