@@ -1,2 +1,5 @@
 
 logs.txt
+.env
+.env.*
+!.env.example
